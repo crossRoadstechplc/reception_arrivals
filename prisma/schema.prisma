@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  RECEPTION
+  FLOOR_ADMIN
+  SUPER_ADMIN
+
+  @@map("role")
+}
+
+enum GuestStatus {
+  EXPECTED
+  ARRIVED
+  CLEARED
+  CANCELLED
+  NO_SHOW
+
+  @@map("guest_status")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  role          Role      @default(RECEPTION)
+  active        Boolean   @default(true)
+  passwordHash  String?   @map("password_hash")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts             Account[]
+  sessions             Session[]
+  floorAssignments     FloorAssignment[]
+  guestsCreated        Guest[]              @relation("GuestCreatedBy")
+  guestsCleared        Guest[]              @relation("GuestClearedBy")
+  passwordResetTokens  PasswordResetToken[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expires   DateTime
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Floor {
+  id        String   @id @default(cuid())
+  name      String
+  number    Int      @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assignments FloorAssignment[]
+  guests      Guest[]
+
+  @@map("floors")
+}
+
+model FloorAssignment {
+  userId  String @map("user_id")
+  floorId String @map("floor_id")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  floor Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  @@id([userId, floorId])
+  @@map("floor_assignments")
+}
+
+model Guest {
+  id              String      @id @default(cuid())
+  floorId         String      @map("floor_id")
+  visitDate       DateTime    @map("visit_date") @db.Date
+  expectedArrival String?     @map("expected_arrival")
+  guestName       String      @map("guest_name")
+  company         String?
+  hostName        String      @map("host_name")
+  status          GuestStatus @default(EXPECTED)
+  notes           String?
+  clearedAt       DateTime?   @map("cleared_at")
+  createdById     String?     @map("created_by_id")
+  clearedById     String?     @map("cleared_by_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  floor     Floor @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  createdBy User? @relation("GuestCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  clearedBy User? @relation("GuestClearedBy", fields: [clearedById], references: [id], onDelete: SetNull)
+
+  @@index([visitDate, floorId])
+  @@index([visitDate, status])
+  @@map("guests")
+}

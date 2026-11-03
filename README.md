@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Arrival Desk
 
-## Getting Started
+Web app for floor guest lists and the ground-floor reception board.
 
-First, run the development server:
+Floor admins add visitors for a date. Reception, on a tablet or a PC, sees every floor and marks a guest cleared for the elevator. A super admin adds floors and people and sets each person's password. Everyone signs in with that email and password. Forgot password sends a reset link through your SMTP server. New floors are added in the admin screen.
+
+## Setup
+
+1. Copy `.env.example` to `.env` and fill in Supabase, the super admin password, and SMTP.
+2. Apply the schema:
+
+```bash
+npx prisma migrate deploy
+npx prisma db seed
+```
+
+3. In the Supabase SQL editor, run [`prisma/sql/realtime.sql`](prisma/sql/realtime.sql). That enables row-level security and live updates on the reception board.
+4. Start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. Open `http://localhost:3000` and sign in with `SEED_SUPER_ADMIN_EMAIL` and `SEED_SUPER_ADMIN_PASSWORD`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Then add a reception user and a floor admin for the 6th floor from the Admin screen.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — local app
+- `npm run build` — production build
+- `npx prisma migrate deploy` — apply database migrations
+- `npx prisma db seed` — create the 6th floor and the super admin
