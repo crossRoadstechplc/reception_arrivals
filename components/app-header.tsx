@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
-import { ROLE_LABEL, type Role } from "@/lib/types";
+import { PERSON_KIND_LABEL, personKind, type FloorRole, type Role } from "@/lib/types";
 import { ArrivalChime } from "@/components/arrival-chime";
 import { BoardIcon, ListIcon, LogoMark, LogoutIcon, SettingsIcon } from "@/components/icons";
 
@@ -20,9 +20,10 @@ export function AppHeader({
   user,
   items,
 }: {
-  user: { name: string | null; email: string | null; role: Role };
+  user: { name: string | null; email: string | null; role: Role; floorAssignments?: { role: FloorRole }[] };
   items: { href: string; label: string; active: boolean }[];
 }) {
+  const roleLabel = PERSON_KIND_LABEL[personKind(user.role, (user.floorAssignments ?? []).map((a) => a.role))];
   return (
     <header className="sticky top-0 z-30 bg-ink text-console-text shadow-[0_1px_0_rgba(255,255,255,0.06)]">
       <ArrivalChime />
@@ -60,11 +61,11 @@ export function AppHeader({
         <div className="flex shrink-0 items-center gap-2">
           <div className="hidden text-right leading-tight md:block">
             <div className="max-w-44 truncate text-sm font-semibold text-white">{user.name || user.email}</div>
-            <div className="text-xs text-console-muted">{ROLE_LABEL[user.role]}</div>
+            <div className="text-xs text-console-muted">{roleLabel}</div>
           </div>
           <span
             className="flex size-9 items-center justify-center rounded-full bg-console-panel text-xs font-bold text-white ring-1 ring-console-line"
-            title={`${user.name || user.email} · ${ROLE_LABEL[user.role]}`}
+            title={`${user.name || user.email} · ${roleLabel}`}
           >
             {initialsOf(user.name, user.email)}
           </span>

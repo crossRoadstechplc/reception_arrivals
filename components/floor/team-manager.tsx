@@ -85,7 +85,7 @@ export function TeamManager({
           <p className="text-xs font-semibold tracking-[0.14em] text-signal uppercase">Floor team</p>
           <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight md:text-[1.75rem]">{floor.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            Members add and see only their own guests. They get an alert when their guest arrives.
+            Floor staff add and see only their own guests. They get an alert when their guest arrives.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -106,7 +106,7 @@ export function TeamManager({
           <RefreshButton />
           <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
             <PlusIcon className="size-4" />
-            Add member
+            Add floor staff
           </button>
         </div>
       </section>
@@ -116,12 +116,12 @@ export function TeamManager({
       {memberCount === 0 ? (
         <EmptyState
           icon={<UserIcon className="size-6" />}
-          title="No members yet"
+          title="No floor staff yet"
           body="Add the people on this floor who receive visitors. They'll get an email to set their password."
           action={
             <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
               <PlusIcon className="size-4" />
-              Add the first member
+              Add the first person
             </button>
           }
         />
@@ -155,8 +155,8 @@ export function TeamManager({
                         !member.active
                           ? "bg-idle-soft text-idle"
                           : member.role === "ADMIN"
-                            ? "bg-ink text-white"
-                            : "bg-arrived text-white"
+                            ? "bg-admin text-white"
+                            : "bg-expected text-white"
                       }`}
                     >
                       {initials(member.name, member.email?.[0]?.toUpperCase())}
@@ -166,11 +166,11 @@ export function TeamManager({
                         <span className="truncate font-semibold">{member.name || "Unnamed"}</span>
                         {isMe ? <span className="badge bg-ink text-white">You</span> : null}
                         <span
-                          className={`badge ${member.role === "ADMIN" ? "bg-signal-soft text-signal-deep" : "bg-arrived-soft text-arrived"}`}
+                          className={`badge ${member.role === "ADMIN" ? "bg-admin-soft text-admin" : "bg-expected-soft text-expected"}`}
                         >
                           {FLOOR_ROLE_LABEL[member.role]}
                         </span>
-                        {member.pending ? <span className="badge bg-expected-soft text-expected">Invite pending</span> : null}
+                        {member.pending ? <span className="badge border border-dashed border-line-strong text-muted">Invite pending</span> : null}
                         {!member.active ? <span className="badge bg-idle-soft text-idle">Turned off</span> : null}
                       </div>
                       <p className="truncate text-sm text-muted">
@@ -205,12 +205,12 @@ export function TeamManager({
                                 role: member.role === "ADMIN" ? "MEMBER" : "ADMIN",
                               }),
                             member.role === "ADMIN"
-                              ? `${member.name || member.email} is now a member`
+                              ? `${member.name || member.email} is now floor staff`
                               : `${member.name || member.email} is now a floor admin`,
                           )
                         }
                       >
-                        {member.role === "ADMIN" ? "Make member" : "Make admin"}
+                        {member.role === "ADMIN" ? "Make floor staff" : "Make floor admin"}
                       </button>
                     ) : null}
                     {canRemove ? (
@@ -280,14 +280,14 @@ function AddMemberModal({
         setError(result.error);
         return;
       }
-      onAdded(result.notice ?? "Member added");
+      onAdded(result.notice ?? "Added");
       onClose();
     });
   }
 
   return (
     <Modal
-      title={`Add a member to ${floor.name}`}
+      title={`Add floor staff to ${floor.name}`}
       description="New people get an email to set their password. People who already have an account just join this floor."
       onClose={onClose}
       footer={
@@ -296,7 +296,7 @@ function AddMemberModal({
             Cancel
           </button>
           <button type="submit" form="member-form" className="btn btn-primary" disabled={pending}>
-            {pending ? "Adding…" : "Add member"}
+            {pending ? "Adding…" : "Add"}
           </button>
         </>
       }

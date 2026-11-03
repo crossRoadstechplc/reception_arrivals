@@ -3,11 +3,22 @@
 import { RefreshButton } from "@/components/refresh-button";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteFloor, inviteUser, resendInvite, saveFloor, updateUser } from "@/lib/actions/admin";
+import { deleteFloor, deleteUser, inviteUser, resendInvite, saveFloor, setUserActive, updateUser } from "@/lib/actions/admin";
 import { PasswordInput, generatePassword } from "@/components/password-input";
-import { FLOOR_ROLE_LABEL, ROLE_DESCRIPTION, ROLE_LABEL, ROLES, type FloorRole, type Role } from "@/lib/types";
+import {
+  FLOOR_ROLE_LABEL,
+  PERSON_KIND_LABEL,
+  PERSON_KINDS,
+  ROLE_DESCRIPTION,
+  ROLE_LABEL,
+  ROLES,
+  personKind,
+  type FloorRole,
+  type PersonKind,
+  type Role,
+} from "@/lib/types";
 import { Alert, ConfirmDialog, EmptyState, Modal, StatTile, Toast, initials, useToast } from "@/components/ui";
-import { BuildingIcon, PencilIcon, PlusIcon, SearchIcon, UserIcon } from "@/components/icons";
+import { BuildingIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, UserIcon } from "@/components/icons";
 
 type FloorRow = {
   id: string;
@@ -29,17 +40,23 @@ type UserRow = {
 
 type Tab = "people" | "floors";
 
-const ROLE_TONE: Record<Role, string> = {
+const KIND_TONE: Record<PersonKind, string> = {
   RECEPTION: "bg-arrived-soft text-arrived",
+  FLOOR_ADMIN: "bg-admin-soft text-admin",
   FLOOR_STAFF: "bg-expected-soft text-expected",
   SUPER_ADMIN: "bg-signal-soft text-signal-deep",
 };
 
-const AVATAR_TONE: Record<Role, string> = {
+const AVATAR_TONE: Record<PersonKind, string> = {
   RECEPTION: "bg-arrived text-white",
+  FLOOR_ADMIN: "bg-admin text-white",
   FLOOR_STAFF: "bg-expected text-white",
   SUPER_ADMIN: "bg-signal text-white",
 };
+
+function kindOf(person: UserRow) {
+  return personKind(person.role, person.floors.map((m) => m.role));
+}
 
 export function AdminConsole({
   floors,
@@ -59,7 +76,8 @@ export function AdminConsole({
     () => ({
       people: users.filter((u) => u.active).length,
       reception: users.filter((u) => u.active && u.role === "RECEPTION").length,
-      floorStaff: users.filter((u) => u.active && u.role === "FLOOR_STAFF").length,
+      floorAdmins: users.filter((u) => u.active && kindOf(u) === "FLOOR_ADMIN").length,
+      floorStaff: users.filter((u) => u.active && kindOf(u) === "FLOOR_STAFF").length,
       floors: floors.filter((f) => f.active).length,
     }),
     [users, floors],
@@ -87,9 +105,10 @@ export function AdminConsole({
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2.5 md:grid-cols-5">
         <StatTile label="Active people" value={stats.people} tone="ink" />
-        <StatTile label="Reception staff" value={stats.reception} tone="arrived" />
+        <StatTile label="Reception" value={stats.reception} tone="arrived" />
+        <StatTile label="Floor admins" value={stats.floorAdmins} tone="admin" />
         <StatTile label="Floor staff" value={stats.floorStaff} tone="expected" />
         <StatTile label="Active floors" value={stats.floors} tone="cleared" />
       </section>
@@ -120,6 +139,7 @@ export function AdminConsole({
           currentUserId={currentUserId}
           onAdd={() => setPersonModal("new")}
           onEdit={(person) => setPersonModal(person)}
+          onNotice={(message, tone) => show({ message, tone })}
         />
       ) : (
         <FloorsTab floors={floors} onAdd={() => setFloorModal("new")} onEdit={(floor) => setFloorModal(floor)} />
@@ -185,23 +205,53 @@ function PeopleTab({
   currentUserId,
   onAdd,
   onEdit,
+  onNotice,
 }: {
   users: UserRow[];
   floors: FloorRow[];
   currentUserId: string;
   onAdd: () => void;
   onEdit: (person: UserRow) => void;
+  onNotice: (message: string, tone?: "success" | "error") => void;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState<Role | "all">("all");
+  const [kind, setKind] = useState<PersonKind | "all">("all");
+  const [removing, setRemoving] = useState<UserRow | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [removePending, startRemove] = useTransition();
+  const [, startTransition] = useTransition();
   const floorName = useMemo(() => new Map(floors.map((f) => [f.id, f.name])), [floors]);
 
   const needle = query.trim().toLowerCase();
   const visible = users.filter((person) => {
-    if (role !== "all" && person.role !== role) return false;
+    if (kind !== "all" && kindOf(person) !== kind) return false;
     if (!needle) return true;
     return `${person.name ?? ""} ${person.email ?? ""}`.toLowerCase().includes(needle);
   });
+
+  function toggleActive(person: UserRow) {
+    setPendingId(person.id);
+    startTransition(async () => {
+      const result = await setUserActive(person.id, !person.active);
+      setPendingId(null);
+      if (!result.ok) return onNotice(result.error, "error");
+      router.refresh();
+      onNotice(result.notice ?? "Saved");
+    });
+  }
+
+  function confirmRemove() {
+    if (!removing) return;
+    const person = removing;
+    startRemove(async () => {
+      const result = await deleteUser(person.id);
+      setRemoving(null);
+      if (!result.ok) return onNotice(result.error, "error");
+      router.refresh();
+      onNotice(result.notice ?? "Removed");
+    });
+  }
 
   if (users.length === 0) {
     return (
@@ -234,12 +284,12 @@ function PeopleTab({
           />
         </label>
         <div className="scrollbar-none flex gap-1.5 overflow-x-auto">
-          <button type="button" className="chip" aria-pressed={role === "all"} onClick={() => setRole("all")}>
+          <button type="button" className="chip" aria-pressed={kind === "all"} onClick={() => setKind("all")}>
             All
           </button>
-          {ROLES.map((item) => (
-            <button key={item} type="button" className="chip" aria-pressed={role === item} onClick={() => setRole(item)}>
-              {ROLE_LABEL[item]}
+          {PERSON_KINDS.map((item) => (
+            <button key={item} type="button" className="chip" aria-pressed={kind === item} onClick={() => setKind(item)}>
+              {PERSON_KIND_LABEL[item]}
             </button>
           ))}
         </div>
@@ -250,49 +300,96 @@ function PeopleTab({
       ) : (
         <ul className="card divide-y divide-line overflow-hidden">
           {visible.map((person) => {
+            const personKindValue = kindOf(person);
             const personFloors = person.floors
-              .map((m) => (floorName.get(m.floorId) ? `${floorName.get(m.floorId)}${m.role === "ADMIN" ? " (admin)" : ""}` : null))
+              .map((m) => {
+                const name = floorName.get(m.floorId);
+                if (!name) return null;
+                // Only call out the role per floor when it differs from the badge.
+                const mixed = new Set(person.floors.map((f) => f.role)).size > 1;
+                return mixed ? `${name} (${m.role === "ADMIN" ? "admin" : "staff"})` : name;
+              })
               .filter(Boolean) as string[];
             const isMe = person.id === currentUserId;
+            const busy = pendingId === person.id;
             return (
-              <li key={person.id} className={`flex items-center gap-3 px-4 py-3 ${person.active ? "" : "bg-panel-2/60"}`}>
-                <span
-                  className={`flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                    person.active ? AVATAR_TONE[person.role] : "bg-idle-soft text-idle"
-                  }`}
-                >
-                  {initials(person.name, person.email?.[0]?.toUpperCase())}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className={`truncate font-semibold ${person.active ? "" : "text-muted"}`}>
-                      {person.name || "Unnamed"}
-                    </span>
-                    {isMe ? <span className="badge bg-ink text-white">You</span> : null}
-                    <span className={`badge ${ROLE_TONE[person.role]}`}>{ROLE_LABEL[person.role]}</span>
-                    {person.pending && person.active ? <span className="badge bg-expected-soft text-expected">Invite pending</span> : null}
-                    {!person.active ? <span className="badge bg-idle-soft text-idle">Can&apos;t sign in</span> : null}
+              <li
+                key={person.id}
+                className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center ${person.active ? "" : "bg-panel-2/60"}`}
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                      person.active ? AVATAR_TONE[personKindValue] : "bg-idle-soft text-idle"
+                    }`}
+                  >
+                    {initials(person.name, person.email?.[0]?.toUpperCase())}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className={`truncate font-semibold ${person.active ? "" : "text-muted"}`}>
+                        {person.name || "Unnamed"}
+                      </span>
+                      {isMe ? <span className="badge bg-ink text-white">You</span> : null}
+                      <span className={`badge ${person.active ? KIND_TONE[personKindValue] : "bg-idle-soft text-idle"}`}>
+                        {PERSON_KIND_LABEL[personKindValue]}
+                      </span>
+                      {person.pending && person.active ? (
+                        <span className="badge border border-dashed border-line-strong text-muted">Invite pending</span>
+                      ) : null}
+                      {!person.active ? <span className="badge bg-danger-soft text-danger">Deactivated</span> : null}
+                    </div>
+                    <p className="truncate text-sm text-muted">
+                      {person.email}
+                      {person.role === "FLOOR_STAFF" ? (
+                        personFloors.length ? (
+                          <span> · {personFloors.join(", ")}</span>
+                        ) : (
+                          <span className="font-semibold text-danger"> · No floor assigned</span>
+                        )
+                      ) : null}
+                    </p>
                   </div>
-                  <p className="truncate text-sm text-muted">
-                    {person.email}
-                    {person.role === "FLOOR_STAFF" ? (
-                      personFloors.length ? (
-                        <span> · {personFloors.join(", ")}</span>
-                      ) : (
-                        <span className="font-semibold text-danger"> · No floor assigned</span>
-                      )
-                    ) : null}
-                  </p>
                 </div>
-                <button type="button" className="btn btn-secondary btn-sm shrink-0" onClick={() => onEdit(person)}>
-                  <PencilIcon className="size-3.5" />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
+                <div className="flex shrink-0 flex-wrap gap-1.5 pl-[3.25rem] sm:pl-0">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(person)}>
+                    <PencilIcon className="size-3.5" />
+                    Edit
+                  </button>
+                  {!isMe ? (
+                    <>
+                      <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => toggleActive(person)}>
+                        {person.active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm text-danger hover:bg-danger-soft hover:text-danger"
+                        disabled={busy}
+                        onClick={() => setRemoving(person)}
+                      >
+                        <TrashIcon className="size-3.5" />
+                        Remove
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
+
+      {removing ? (
+        <ConfirmDialog
+          title={`Remove ${removing.name || removing.email}?`}
+          body="This deletes the account for good. Their guests stay on the list with the host name kept. To block access but keep the account, use Deactivate instead."
+          confirmLabel="Remove person"
+          danger
+          pending={removePending}
+          onConfirm={confirmRemove}
+          onClose={() => setRemoving(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -470,7 +567,7 @@ function PersonModal({
                               current === option ? (option ? "bg-ink text-white" : "bg-idle-soft text-ink") : "text-muted hover:text-ink"
                             }`}
                           >
-                            {option === "ADMIN" ? "Admin" : option ? FLOOR_ROLE_LABEL[option] : "None"}
+                            {option ? FLOOR_ROLE_LABEL[option] : "None"}
                           </button>
                         ))}
                       </div>

@@ -340,7 +340,7 @@ export function StatTile({
 }: {
   label: string;
   value: number;
-  tone: "expected" | "arrived" | "cleared" | "idle" | "ink";
+  tone: "expected" | "arrived" | "cleared" | "idle" | "ink" | "admin";
   active?: boolean;
   onClick?: () => void;
 }) {
@@ -350,6 +350,7 @@ export function StatTile({
     cleared: "bg-cleared",
     idle: "bg-idle",
     ink: "bg-ink",
+    admin: "bg-admin",
   }[tone];
   const content = (
     <>

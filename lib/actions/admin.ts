@@ -199,3 +199,32 @@ export async function resendInvite(userId: string): Promise<ActionResult> {
   }
   return { ok: true, notice: `Invite sent to ${user.email}.` };
 }
+
+/** Turn sign-in on or off for someone. They are signed out on their next request. */
+export async function setUserActive(userId: string, active: boolean): Promise<ActionResult> {
+  const actor = await requireRoles(["SUPER_ADMIN"]);
+  if (userId === actor.id) return { ok: false, error: "You can't deactivate yourself." };
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) return { ok: false, error: "Person not found." };
+  await db.user.update({ where: { id: userId }, data: { active } });
+  refreshAdmin();
+  return { ok: true, notice: `${user.name || user.email} ${active ? "can sign in again" : "is deactivated"}` };
+}
+
+/**
+ * Permanently deletes an account. Their guests stay on the list; the host
+ * name is kept as text.
+ */
+export async function deleteUser(userId: string): Promise<ActionResult> {
+  const actor = await requireRoles(["SUPER_ADMIN"]);
+  if (userId === actor.id) return { ok: false, error: "You can't remove yourself." };
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) return { ok: false, error: "Person not found." };
+  if (user.role === "SUPER_ADMIN") {
+    const others = await db.user.count({ where: { role: "SUPER_ADMIN", active: true, id: { not: userId } } });
+    if (others === 0) return { ok: false, error: "Keep at least one active super admin." };
+  }
+  await db.user.delete({ where: { id: userId } });
+  refreshAdmin();
+  return { ok: true, notice: `${user.name || user.email} removed` };
+}

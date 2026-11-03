@@ -25,6 +25,8 @@
   --cleared-soft: #e0f2e7;
   --danger: #b03434;
   --danger-soft: #fbe6e6;
+  --admin: #6a46b8;
+  --admin-soft: #efe9fb;
   --idle: #6b716d;
   --idle-soft: #eeedea;
 
@@ -56,6 +58,8 @@
   --color-cleared-soft: var(--cleared-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
+  --color-admin: var(--admin);
+  --color-admin-soft: var(--admin-soft);
   --color-idle: var(--idle);
   --color-idle-soft: var(--idle-soft);
   --color-console: var(--console);
