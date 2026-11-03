@@ -5,6 +5,16 @@ import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import type { Role } from "@/lib/types";
 
+// A localhost AUTH_URL copied into Vercel would send people to localhost after
+// sign-in. On Vercel, drop it so sign-in uses the address the visitor came from.
+if (process.env.VERCEL) {
+  for (const key of ["AUTH_URL", "NEXTAUTH_URL"] as const) {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?/i.test(process.env[key] ?? "")) {
+      delete process.env[key];
+    }
+  }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
   trustHost: true,

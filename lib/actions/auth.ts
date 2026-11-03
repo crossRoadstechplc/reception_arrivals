@@ -3,7 +3,7 @@
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { sendPasswordResetEmail } from "@/lib/mail";
+import { appUrl, sendPasswordResetEmail } from "@/lib/mail";
 import { hashPassword, hashResetToken, newResetToken } from "@/lib/password";
 
 export type LoginState = { error?: string } | null;
@@ -80,11 +80,7 @@ export async function requestPasswordReset(
       await db.passwordResetToken.create({
         data: { userId: user.id, tokenHash, expires },
       });
-      const base = process.env.AUTH_URL || "http://localhost:3000";
-      await sendPasswordResetEmail(
-        email,
-        `${base}/reset-password?token=${encodeURIComponent(token)}`,
-      );
+      await sendPasswordResetEmail(email, appUrl(`/reset-password?token=${encodeURIComponent(token)}`));
     }
   } catch (error) {
     console.error(error);

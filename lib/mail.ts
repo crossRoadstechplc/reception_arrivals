@@ -8,9 +8,32 @@ export function smtpConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
 }
 
+function isLocal(url: string) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?/i.test(url);
+}
+
+function withHttps(host: string) {
+  return /^https?:\/\//i.test(host) ? host : `https://${host}`;
+}
+
+/**
+ * Public address of the app, used for every link in emails.
+ * Order: APP_URL, then AUTH_URL, then Vercel's production domain.
+ * A localhost value is ignored when running on Vercel, so emails from the
+ * live site never point at someone's computer.
+ */
 export function appUrl(path = "") {
-  const base = (process.env.AUTH_URL || "http://localhost:3000").replace(/\/$/, "");
-  return `${base}${path}`;
+  const onVercel = Boolean(process.env.VERCEL);
+  const candidates = [
+    process.env.APP_URL,
+    process.env.AUTH_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL && withHttps(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    process.env.VERCEL_URL && withHttps(process.env.VERCEL_URL),
+  ];
+  const base =
+    candidates.find((value): value is string => Boolean(value) && !(onVercel && isLocal(value!))) ??
+    "http://localhost:3000";
+  return `${base.trim().replace(/\/+$/, "")}${path}`;
 }
 
 export async function sendMail(input: {
