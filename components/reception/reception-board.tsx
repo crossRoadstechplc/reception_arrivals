@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshButton } from "@/components/refresh-button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setReceptionStatus } from "@/lib/actions/guests";
@@ -21,7 +22,6 @@ import {
   CheckIcon,
   ChevronDown,
   NoteIcon,
-  RefreshIcon,
   SearchIcon,
   UndoIcon,
   UserIcon,
@@ -88,7 +88,6 @@ export function ReceptionBoard({
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState<string | null>(null);
-  const [refreshing, startRefresh] = useTransition();
   const [, startTransition] = useTransition();
   const { toast, show, dismiss } = useToast();
 
@@ -202,15 +201,7 @@ export function ReceptionBoard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator live={live} />
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon"
-            aria-label="Refresh now"
-            title="Refresh now"
-            onClick={() => startRefresh(() => router.refresh())}
-          >
-            <RefreshIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
+          <RefreshButton />
           <DateNav date={date} today={today} onChange={go} />
         </div>
       </section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshButton } from "@/components/refresh-button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addTeamMember, removeTeamMember, resendTeamInvite, setTeamRole } from "@/lib/actions/team";
@@ -102,6 +103,7 @@ export function TeamManager({
               ))}
             </select>
           ) : null}
+          <RefreshButton />
           <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
             <PlusIcon className="size-4" />
             Add member

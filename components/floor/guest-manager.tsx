@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshButton } from "@/components/refresh-button";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteGuest, saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
@@ -140,6 +141,7 @@ export function GuestManager({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator live={live} />
+          <RefreshButton />
           {floors.length > 1 ? (
             <label className="relative">
               <span className="sr-only">Floor</span>

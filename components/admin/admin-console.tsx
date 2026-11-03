@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshButton } from "@/components/refresh-button";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteFloor, inviteUser, resendInvite, saveFloor, updateUser } from "@/lib/actions/admin";
@@ -73,14 +74,17 @@ export function AdminConsole({
           <p className="text-xs font-semibold tracking-[0.14em] text-signal uppercase">Admin</p>
           <h1 className="mt-0.5 text-2xl font-semibold tracking-tight md:text-[1.75rem]">People and floors</h1>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => (tab === "people" ? setPersonModal("new") : setFloorModal("new"))}
-        >
-          <PlusIcon className="size-4" />
-          {tab === "people" ? "Add person" : "Add floor"}
-        </button>
+        <div className="flex items-center gap-2">
+          <RefreshButton />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => (tab === "people" ? setPersonModal("new") : setFloorModal("new"))}
+          >
+            <PlusIcon className="size-4" />
+            {tab === "people" ? "Add person" : "Add floor"}
+          </button>
+        </div>
       </section>
 
       <section className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
