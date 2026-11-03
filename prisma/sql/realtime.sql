@@ -9,6 +9,8 @@ alter table public.verification_tokens enable row level security;
 alter table public.floors enable row level security;
 alter table public.floor_assignments enable row level security;
 alter table public.guests enable row level security;
+alter table public.push_subscriptions enable row level security;
+alter table public.password_reset_tokens enable row level security;
 
 create or replace function public.notify_guest_change()
 returns trigger

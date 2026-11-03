@@ -33,6 +33,9 @@ export type BoardGuest = {
   guestName: string;
   company: string | null;
   hostName: string;
+  hostHasAccount: boolean;
+  hostNotifiedVia: string | null;
+  arrivedAt: string | null;
   expectedArrival: string | null;
   status: GuestStatus;
   notes: string | null;
@@ -276,7 +279,7 @@ export function ReceptionBoard({
           title={guests.length === 0 ? "No guests listed for this day" : "No guests match this view"}
           body={
             guests.length === 0
-              ? "Floor admins add visitors ahead of time. New names appear here automatically."
+              ? "Floor staff add their visitors ahead of time. New names appear here automatically."
               : "Try another floor or status, or clear the search."
           }
         />
@@ -377,9 +380,11 @@ function GuestRow({
             </div>
             <p className="mt-0.5 text-sm text-muted">
               {guest.company ? <span className="font-medium text-ink-soft">{guest.company} · </span> : null}
-              Host: {guest.hostName}
+              Visiting <span className="font-semibold text-ink">{guest.hostName}</span>
+              {guest.arrivedAt && guest.status === "ARRIVED" ? ` · arrived ${formatClock(guest.arrivedAt, timeZone)}` : ""}
               {guest.clearedAt && guest.status === "CLEARED" ? ` · cleared ${formatClock(guest.clearedAt, timeZone)}` : ""}
             </p>
+            <HostNotice guest={guest} />
             {guest.notes ? (
               <p className="mt-1.5 inline-flex max-w-full items-start gap-1.5 rounded-lg bg-expected-soft px-2 py-1 text-xs font-medium text-expected">
                 <NoteIcon className="mt-px size-3.5 shrink-0" />
@@ -432,5 +437,30 @@ function GuestRow({
         </div>
       </div>
     </li>
+  );
+}
+
+const NOTIFIED_LABEL: Record<string, string> = {
+  push: "Host alerted on their device",
+  email: "Host emailed",
+  "push+email": "Host alerted on device and by email",
+  none: "Host has no alerts set up. Call them if needed",
+};
+
+/** After check-in, tells reception whether the host already knows. */
+function HostNotice({ guest }: { guest: BoardGuest }) {
+  if (guest.status !== "ARRIVED" && guest.status !== "CLEARED") return null;
+  if (!guest.hostHasAccount) {
+    return <p className="mt-1 text-xs font-medium text-muted">Host isn&apos;t on Arrival Desk. Let them know directly.</p>;
+  }
+  if (!guest.hostNotifiedVia) {
+    return <p className="mt-1 text-xs font-medium text-muted">Alerting host…</p>;
+  }
+  const ok = guest.hostNotifiedVia !== "none";
+  return (
+    <p className={`mt-1 inline-flex items-center gap-1 text-xs font-semibold ${ok ? "text-cleared" : "text-expected"}`}>
+      {ok ? <CheckIcon className="size-3.5" /> : null}
+      {NOTIFIED_LABEL[guest.hostNotifiedVia] ?? "Host alerted"}
+    </p>
   );
 }

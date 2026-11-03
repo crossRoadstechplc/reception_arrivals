@@ -4,13 +4,13 @@ import { AuthShell } from "@/components/auth-shell";
 export default async function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; invite?: string }>;
 }) {
   const params = await searchParams;
 
   return (
     <AuthShell>
-      <ResetPasswordForm token={params.token ?? ""} />
+      <ResetPasswordForm token={params.token ?? ""} invite={params.invite === "1"} />
     </AuthShell>
   );
 }

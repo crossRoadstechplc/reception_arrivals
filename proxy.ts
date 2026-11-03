@@ -14,6 +14,9 @@ export function proxy(request: NextRequest) {
     pathname === "/login" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
+    pathname === "/sw.js" ||
+    pathname.startsWith("/sounds/") ||
+    pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/api/auth");
   const signedIn = hasSession(request);
 

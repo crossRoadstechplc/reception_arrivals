@@ -10,7 +10,8 @@ export const guestInputSchema = z.object({
   visitDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
   guestName: z.string().trim().min(2, "Enter the guest name").max(120),
   company: z.string().trim().max(120).optional().or(z.literal("")),
-  hostName: z.string().trim().min(2, "Enter the host").max(120),
+  hostUserId: z.string().optional().or(z.literal("")),
+  hostName: z.string().trim().max(120).optional().or(z.literal("")),
   expectedArrival: time.optional().or(z.literal("")),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
 });
@@ -23,15 +24,27 @@ export const floorInputSchema = z.object({
 
 const passwordSchema = z.string().min(8, "Use at least 8 characters").max(200);
 
+export const optionalPasswordSchema = z.union([z.literal(""), passwordSchema]);
+
+const floorMembership = z.object({
+  floorId: z.string().min(1),
+  role: z.enum(["ADMIN", "MEMBER"]),
+});
+
 export const inviteSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
   name: z.string().trim().min(2, "Enter a name").max(80),
-  password: passwordSchema,
-  role: z.enum(["RECEPTION", "FLOOR_ADMIN", "SUPER_ADMIN"]),
-  floorIds: z.array(z.string()).default([]),
+  /** Blank means "email them an invite link to set their own password". */
+  password: optionalPasswordSchema,
+  role: z.enum(["RECEPTION", "FLOOR_STAFF", "SUPER_ADMIN"]),
+  floors: z.array(floorMembership).default([]),
 });
 
-export const optionalPasswordSchema = z.union([z.literal(""), passwordSchema]);
+export const teamMemberSchema = z.object({
+  floorId: z.string().min(1),
+  email: z.string().trim().email("Enter a valid email"),
+  name: z.string().trim().max(80).optional().or(z.literal("")),
+});
 
 export function blankToNull(value: string | undefined) {
   const trimmed = value?.trim() ?? "";

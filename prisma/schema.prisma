@@ -10,10 +10,18 @@ datasource db {
 
 enum Role {
   RECEPTION
-  FLOOR_ADMIN
+  FLOOR_STAFF
   SUPER_ADMIN
 
   @@map("role")
+}
+
+/// Role a person has on one specific floor.
+enum FloorRole {
+  ADMIN
+  MEMBER
+
+  @@map("floor_role")
 }
 
 enum GuestStatus {
@@ -43,7 +51,10 @@ model User {
   floorAssignments     FloorAssignment[]
   guestsCreated        Guest[]              @relation("GuestCreatedBy")
   guestsCleared        Guest[]              @relation("GuestClearedBy")
+  guestsHosted         Guest[]              @relation("GuestHost")
+  guestsArrived        Guest[]              @relation("GuestArrivedBy")
   passwordResetTokens  PasswordResetToken[]
+  pushSubscriptions    PushSubscription[]
 
   @@map("users")
 }
@@ -119,14 +130,19 @@ model Floor {
   @@map("floors")
 }
 
+/// A person's membership on a floor. One row per (person, floor), so a person
+/// is unique on a floor but can belong to many floors.
 model FloorAssignment {
-  userId  String @map("user_id")
-  floorId String @map("floor_id")
+  userId    String    @map("user_id")
+  floorId   String    @map("floor_id")
+  role      FloorRole @default(MEMBER)
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   floor Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
 
   @@id([userId, floorId])
+  @@index([floorId])
   @@map("floor_assignments")
 }
 
@@ -143,14 +159,40 @@ model Guest {
   clearedAt       DateTime?   @map("cleared_at")
   createdById     String?     @map("created_by_id")
   clearedById     String?     @map("cleared_by_id")
+  /// The floor member this guest is visiting. Null for guests of people without an account.
+  hostUserId      String?     @map("host_user_id")
+  arrivedAt       DateTime?   @map("arrived_at")
+  arrivedById     String?     @map("arrived_by_id")
+  hostNotifiedAt  DateTime?   @map("host_notified_at")
+  /// "push", "email", "push+email", or "none".
+  hostNotifiedVia String?     @map("host_notified_via")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   floor     Floor @relation(fields: [floorId], references: [id], onDelete: Restrict)
   createdBy User? @relation("GuestCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   clearedBy User? @relation("GuestClearedBy", fields: [clearedById], references: [id], onDelete: SetNull)
+  hostUser  User? @relation("GuestHost", fields: [hostUserId], references: [id], onDelete: SetNull)
+  arrivedBy User? @relation("GuestArrivedBy", fields: [arrivedById], references: [id], onDelete: SetNull)
 
   @@index([visitDate, floorId])
   @@index([visitDate, status])
+  @@index([hostUserId, visitDate])
   @@map("guests")
+}
+
+/// A browser that agreed to receive push notifications for a user.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

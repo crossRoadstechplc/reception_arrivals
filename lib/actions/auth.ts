@@ -72,7 +72,8 @@ export async function requestPasswordReset(
 
   try {
     const user = await db.user.findUnique({ where: { email } });
-    if (user?.active && user.passwordHash) {
+    // Also works for invited people who never set a password (lost invite email).
+    if (user?.active) {
       const { token, tokenHash } = newResetToken();
       const expires = new Date(Date.now() + 60 * 60 * 1000);
       await db.passwordResetToken.deleteMany({ where: { userId: user.id } });

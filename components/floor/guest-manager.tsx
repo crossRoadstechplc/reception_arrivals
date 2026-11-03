@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
 import { formatClock } from "@/lib/dates";
-import { type GuestStatus } from "@/lib/types";
+import { FLOOR_ROLE_LABEL, OTHER_HOST, type FloorRole, type GuestStatus } from "@/lib/types";
 import {
   Alert,
   DateHeading,
@@ -17,6 +17,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
+import { PushPrompt } from "@/components/push-prompt";
 import { BuildingIcon, NoteIcon, PencilIcon, PlusIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
 export type FloorGuest = {
@@ -24,13 +25,16 @@ export type FloorGuest = {
   guestName: string;
   company: string | null;
   hostName: string;
+  hostUserId: string | null;
   expectedArrival: string | null;
   status: GuestStatus;
   notes: string | null;
+  arrivedAt: string | null;
   clearedAt: string | null;
 };
 
-type FloorOption = { id: string; name: string; number: number };
+type FloorOption = { id: string; name: string; number: number; role: FloorRole };
+type HostOption = { id: string; name: string };
 
 export function GuestManager({
   date,
@@ -38,7 +42,9 @@ export function GuestManager({
   timeZone,
   floors,
   floorId,
-  canPickFloor,
+  myRole,
+  currentUserId,
+  hosts,
   guests,
 }: {
   date: string;
@@ -46,7 +52,9 @@ export function GuestManager({
   timeZone: string;
   floors: FloorOption[];
   floorId: string | null;
-  canPickFloor: boolean;
+  myRole: FloorRole | null;
+  currentUserId: string;
+  hosts: HostOption[];
   guests: FloorGuest[];
 }) {
   const router = useRouter();
@@ -57,6 +65,7 @@ export function GuestManager({
   const [, startTransition] = useTransition();
   const { toast, show, dismiss } = useToast();
   const floor = floors.find((item) => item.id === floorId);
+  const isAdmin = myRole === "ADMIN";
   const isPast = date < today;
 
   const counts = useMemo(
@@ -101,16 +110,18 @@ export function GuestManager({
     });
   }
 
+  const heading = isAdmin ? (floor?.name ?? "Floor guests") : `My guests${floor ? ` · ${floor.name}` : ""}`;
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-5 md:px-5">
       {/* Title row */}
       <section className="flex flex-wrap items-end gap-3">
         <div className="mr-auto min-w-0">
-          <DateHeading date={date} today={today} title={floor?.name ?? "Floor guests"} />
+          <DateHeading date={date} today={today} title={heading} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator live={live} />
-          {canPickFloor && floors.length > 1 ? (
+          {floors.length > 1 ? (
             <label className="relative">
               <span className="sr-only">Floor</span>
               <select
@@ -121,6 +132,7 @@ export function GuestManager({
                 {floors.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.number} · {item.name}
+                    {item.role === "ADMIN" ? ` (${FLOOR_ROLE_LABEL.ADMIN.toLowerCase()})` : ""}
                   </option>
                 ))}
               </select>
@@ -133,11 +145,13 @@ export function GuestManager({
       {!floorId ? (
         <EmptyState
           icon={<BuildingIcon className="size-6" />}
-          title="No floor assigned to you yet"
-          body="Ask a super admin to assign your floor. Once they do, you can add guests here."
+          title="You're not on a floor yet"
+          body="Ask your floor admin to add you to their floor team. Once they do, you can add guests here."
         />
       ) : (
         <>
+          <PushPrompt />
+
           {/* Day summary + main action */}
           <section className="grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(4,1fr)_auto]">
             <StatTile label="Expected" value={counts.expected} tone="expected" />
@@ -165,12 +179,16 @@ export function GuestManager({
           {guests.length === 0 ? (
             <EmptyState
               icon={<UserIcon className="size-6" />}
-              title="No guests for this day"
-              body="Add the people reception should expect. They will show on the lobby board right away."
+              title={isAdmin ? "No guests for this day" : "You have no guests this day"}
+              body={
+                isAdmin
+                  ? "Add the people reception should expect, or let your team add their own."
+                  : "Add the people you're expecting. Reception will see them, and you'll be told when they arrive."
+              }
               action={
                 <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
                   <PlusIcon className="size-4" />
-                  Add the first guest
+                  Add a guest
                 </button>
               }
             />
@@ -179,8 +197,14 @@ export function GuestManager({
               {guests.map((guest) => {
                 const inactive = guest.status === "CANCELLED" || guest.status === "NO_SHOW";
                 const pending = pendingId === guest.id;
+                const mine = guest.hostUserId === currentUserId;
                 return (
-                  <li key={guest.id} className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center ${inactive ? "bg-panel-2/60" : ""}`}>
+                  <li
+                    key={guest.id}
+                    className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center ${inactive ? "bg-panel-2/60" : ""} ${
+                      guest.status === "ARRIVED" ? "bg-arrived-soft/40" : ""
+                    }`}
+                  >
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                       <div className={`w-14 shrink-0 pt-0.5 font-mono text-base font-medium ${inactive ? "text-muted" : ""}`}>
                         {guest.expectedArrival ?? "—:—"}
@@ -194,10 +218,21 @@ export function GuestManager({
                         </div>
                         <p className="mt-0.5 text-sm text-muted">
                           {guest.company ? <span className="font-medium text-ink-soft">{guest.company} · </span> : null}
-                          Host: {guest.hostName}
-                          {guest.status === "CLEARED" && guest.clearedAt
-                            ? ` · went up at ${formatClock(guest.clearedAt, timeZone)}`
-                            : ""}
+                          {isAdmin ? (
+                            <>
+                              Host: <span className="font-medium text-ink-soft">{mine ? "You" : guest.hostName}</span>
+                            </>
+                          ) : null}
+                          {guest.status === "ARRIVED" && guest.arrivedAt ? (
+                            <span className="font-semibold text-arrived">
+                              {isAdmin ? " · " : ""}In the lobby since {formatClock(guest.arrivedAt, timeZone)}
+                            </span>
+                          ) : null}
+                          {guest.status === "CLEARED" && guest.clearedAt ? (
+                            <span>
+                              {isAdmin ? " · " : ""}Went up at {formatClock(guest.clearedAt, timeZone)}
+                            </span>
+                          ) : null}
                         </p>
                         {guest.notes ? (
                           <p className="mt-1.5 inline-flex max-w-full items-start gap-1.5 text-xs text-muted">
@@ -250,6 +285,9 @@ export function GuestManager({
           date={editing === "new" && date < today ? today : date}
           floorId={floorId}
           floorName={floor?.name ?? ""}
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
+          hosts={hosts}
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
@@ -265,6 +303,9 @@ function GuestForm({
   date,
   floorId,
   floorName,
+  isAdmin,
+  currentUserId,
+  hosts,
   guest,
   onClose,
   onSaved,
@@ -272,6 +313,9 @@ function GuestForm({
   date: string;
   floorId: string;
   floorName: string;
+  isAdmin: boolean;
+  currentUserId: string;
+  hosts: HostOption[];
   guest: FloorGuest | null;
   onClose: () => void;
   onSaved: (name: string, isNew: boolean) => void;
@@ -283,6 +327,9 @@ function GuestForm({
   const [addedCount, setAddedCount] = useState(0);
   const [pending, startTransition] = useTransition();
   const keepOpen = useRef(false);
+  const [hostChoice, setHostChoice] = useState<string>(
+    guest ? (guest.hostUserId ?? OTHER_HOST) : currentUserId,
+  );
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -290,13 +337,13 @@ function GuestForm({
     keepOpen.current = false;
     startTransition(async () => {
       const guestName = String(formData.get("guestName") ?? "");
-      const visitDate = String(formData.get("visitDate") ?? date);
       const result = await saveGuest({
         id: guest?.id,
         floorId,
-        visitDate,
+        visitDate: String(formData.get("visitDate") ?? date),
         guestName,
         company: String(formData.get("company") ?? ""),
+        hostUserId: isAdmin ? hostChoice : currentUserId,
         hostName: String(formData.get("hostName") ?? ""),
         expectedArrival: String(formData.get("expectedArrival") ?? ""),
         notes: String(formData.get("notes") ?? ""),
@@ -370,35 +417,64 @@ function GuestForm({
             minLength={2}
           />
         </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label>
-            <span className="label">Company <span className="font-normal text-muted">(optional)</span></span>
-            <input className="field" name="company" defaultValue={guest?.company ?? ""} />
-          </label>
-          <label>
-            <span className="label">Host</span>
-            <input
-              className="field"
-              name="hostName"
-              defaultValue={guest?.hostName ?? ""}
-              placeholder="Who are they meeting?"
-              required
-              minLength={2}
-            />
-          </label>
-        </div>
+        <label>
+          <span className="label">
+            Company <span className="font-normal text-muted">(optional)</span>
+          </span>
+          <input className="field" name="company" defaultValue={guest?.company ?? ""} />
+        </label>
+
+        {isAdmin ? (
+          <div className="grid gap-2">
+            <label>
+              <span className="label">Who are they visiting?</span>
+              <select className="field" value={hostChoice} onChange={(event) => setHostChoice(event.target.value)}>
+                {guest?.hostUserId && !hosts.some((h) => h.id === guest.hostUserId) ? (
+                  <option value={guest.hostUserId}>{guest.hostName} (no longer on this floor)</option>
+                ) : null}
+                {hosts.map((host) => (
+                  <option key={host.id} value={host.id}>
+                    {host.id === currentUserId ? `Me (${host.name})` : host.name}
+                  </option>
+                ))}
+                <option value={OTHER_HOST}>Someone else (type a name)</option>
+              </select>
+            </label>
+            {hostChoice === OTHER_HOST ? (
+              <input
+                className="field"
+                name="hostName"
+                defaultValue={guest && !guest.hostUserId ? guest.hostName : ""}
+                placeholder="Host's name"
+                required
+                minLength={2}
+              />
+            ) : (
+              <p className="hint -mt-1">They&apos;ll get an alert when reception checks the guest in.</p>
+            )}
+          </div>
+        ) : (
+          <p className="rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">
+            You&apos;re the host. You&apos;ll get an alert when reception checks them in.
+          </p>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
             <span className="label">Visit date</span>
             <input className="field" type="date" name="visitDate" defaultValue={date} required />
           </label>
           <label>
-            <span className="label">Expected time <span className="font-normal text-muted">(optional)</span></span>
+            <span className="label">
+              Expected time <span className="font-normal text-muted">(optional)</span>
+            </span>
             <input className="field" type="time" name="expectedArrival" defaultValue={guest?.expectedArrival ?? ""} />
           </label>
         </div>
         <label>
-          <span className="label">Notes for reception <span className="font-normal text-muted">(optional)</span></span>
+          <span className="label">
+            Notes for reception <span className="font-normal text-muted">(optional)</span>
+          </span>
           <textarea
             className="field"
             name="notes"

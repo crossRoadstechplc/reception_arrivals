@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteFloor, inviteUser, saveFloor, updateUser } from "@/lib/actions/admin";
+import { deleteFloor, inviteUser, resendInvite, saveFloor, updateUser } from "@/lib/actions/admin";
 import { PasswordInput, generatePassword } from "@/components/password-input";
-import { ROLE_DESCRIPTION, ROLE_LABEL, ROLES, type Role } from "@/lib/types";
+import { FLOOR_ROLE_LABEL, ROLE_DESCRIPTION, ROLE_LABEL, ROLES, type FloorRole, type Role } from "@/lib/types";
 import { Alert, ConfirmDialog, EmptyState, Modal, StatTile, Toast, initials, useToast } from "@/components/ui";
 import { BuildingIcon, PencilIcon, PlusIcon, SearchIcon, UserIcon } from "@/components/icons";
 
@@ -22,20 +22,21 @@ type UserRow = {
   email: string | null;
   role: Role;
   active: boolean;
-  floorIds: string[];
+  pending: boolean;
+  floors: { floorId: string; role: FloorRole }[];
 };
 
 type Tab = "people" | "floors";
 
 const ROLE_TONE: Record<Role, string> = {
   RECEPTION: "bg-arrived-soft text-arrived",
-  FLOOR_ADMIN: "bg-expected-soft text-expected",
+  FLOOR_STAFF: "bg-expected-soft text-expected",
   SUPER_ADMIN: "bg-signal-soft text-signal-deep",
 };
 
 const AVATAR_TONE: Record<Role, string> = {
   RECEPTION: "bg-arrived text-white",
-  FLOOR_ADMIN: "bg-expected text-white",
+  FLOOR_STAFF: "bg-expected text-white",
   SUPER_ADMIN: "bg-signal text-white",
 };
 
@@ -57,7 +58,7 @@ export function AdminConsole({
     () => ({
       people: users.filter((u) => u.active).length,
       reception: users.filter((u) => u.active && u.role === "RECEPTION").length,
-      floorAdmins: users.filter((u) => u.active && u.role === "FLOOR_ADMIN").length,
+      floorStaff: users.filter((u) => u.active && u.role === "FLOOR_STAFF").length,
       floors: floors.filter((f) => f.active).length,
     }),
     [users, floors],
@@ -85,7 +86,7 @@ export function AdminConsole({
       <section className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
         <StatTile label="Active people" value={stats.people} tone="ink" />
         <StatTile label="Reception staff" value={stats.reception} tone="arrived" />
-        <StatTile label="Floor admins" value={stats.floorAdmins} tone="expected" />
+        <StatTile label="Floor staff" value={stats.floorStaff} tone="expected" />
         <StatTile label="Active floors" value={stats.floors} tone="cleared" />
       </section>
 
@@ -95,7 +96,7 @@ export function AdminConsole({
             {floorsWithoutAdmin.length === 1 ? "1 floor has" : `${floorsWithoutAdmin.length} floors have`} no floor admin:
           </span>
           <span>{floorsWithoutAdmin.map((f) => f.name).join(", ")}.</span>
-          <span>Nobody can add guests there yet.</span>
+          <span>Nobody there can add members yet. Edit a person and make them that floor&apos;s admin.</span>
         </div>
       ) : null}
 
@@ -245,7 +246,9 @@ function PeopleTab({
       ) : (
         <ul className="card divide-y divide-line overflow-hidden">
           {visible.map((person) => {
-            const personFloors = person.floorIds.map((id) => floorName.get(id)).filter(Boolean) as string[];
+            const personFloors = person.floors
+              .map((m) => (floorName.get(m.floorId) ? `${floorName.get(m.floorId)}${m.role === "ADMIN" ? " (admin)" : ""}` : null))
+              .filter(Boolean) as string[];
             const isMe = person.id === currentUserId;
             return (
               <li key={person.id} className={`flex items-center gap-3 px-4 py-3 ${person.active ? "" : "bg-panel-2/60"}`}>
@@ -263,11 +266,12 @@ function PeopleTab({
                     </span>
                     {isMe ? <span className="badge bg-ink text-white">You</span> : null}
                     <span className={`badge ${ROLE_TONE[person.role]}`}>{ROLE_LABEL[person.role]}</span>
+                    {person.pending && person.active ? <span className="badge bg-expected-soft text-expected">Invite pending</span> : null}
                     {!person.active ? <span className="badge bg-idle-soft text-idle">Can&apos;t sign in</span> : null}
                   </div>
                   <p className="truncate text-sm text-muted">
                     {person.email}
-                    {person.role === "FLOOR_ADMIN" ? (
+                    {person.role === "FLOOR_STAFF" ? (
                       personFloors.length ? (
                         <span> · {personFloors.join(", ")}</span>
                       ) : (
@@ -305,15 +309,36 @@ function PersonModal({
   const router = useRouter();
   const isNew = !person;
   const [role, setRole] = useState<Role>(person?.role ?? "RECEPTION");
-  const [selectedFloors, setSelectedFloors] = useState<string[]>(person?.floorIds ?? []);
+  const [memberships, setMemberships] = useState<Record<string, FloorRole>>(
+    Object.fromEntries((person?.floors ?? []).map((m) => [m.floorId, m.role])),
+  );
+  const [setupMode, setSetupMode] = useState<"invite" | "password">("invite");
   const [active, setActive] = useState(person?.active ?? true);
   const [password, setPassword] = useState("");
   const [revealKey, setRevealKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function toggleFloor(id: string) {
-    setSelectedFloors((current) => (current.includes(id) ? current.filter((f) => f !== id) : [...current, id]));
+  const selectedFloors = Object.entries(memberships).map(([floorId, floorRole]) => ({ floorId, role: floorRole }));
+  const [resending, startResend] = useTransition();
+  const [resendNote, setResendNote] = useState<string | null>(null);
+
+  function setFloorRole(floorId: string, next: FloorRole | null) {
+    setMemberships((current) => {
+      const copy = { ...current };
+      if (next) copy[floorId] = next;
+      else delete copy[floorId];
+      return copy;
+    });
+  }
+
+  function resend() {
+    if (!person) return;
+    setResendNote(null);
+    startResend(async () => {
+      const result = await resendInvite(person.id);
+      setResendNote(result.ok ? (result.notice ?? "Invite sent.") : result.error);
+    });
   }
 
   function onSubmit(formData: FormData) {
@@ -324,16 +349,16 @@ function PersonModal({
         ? await inviteUser({
             email: String(formData.get("email") ?? ""),
             name,
-            password,
+            password: setupMode === "password" ? password : "",
             role,
-            floorIds: selectedFloors,
+            floors: selectedFloors,
           })
         : await updateUser({
             userId: person.id,
             name,
             role: locked ? "SUPER_ADMIN" : role,
             active: locked ? true : active,
-            floorIds: selectedFloors,
+            floors: selectedFloors,
             password,
           });
       if (!result.ok) {
@@ -349,7 +374,7 @@ function PersonModal({
   return (
     <Modal
       title={isNew ? "Add person" : `Edit ${person.name || person.email}`}
-      description={isNew ? "They sign in with this email and the password you set." : person.email ?? undefined}
+      description={isNew ? "They sign in with this email." : person.email ?? undefined}
       size="lg"
       onClose={onClose}
       footer={
@@ -410,60 +435,119 @@ function PersonModal({
           </div>
         </fieldset>
 
-        {role === "FLOOR_ADMIN" ? (
+        {role === "FLOOR_STAFF" ? (
           <fieldset>
-            <legend className="label">Floors they manage</legend>
+            <legend className="label">Floors</legend>
+            <p className="hint -mt-1 mb-2">
+              Admins see every guest on the floor and manage its team. Members see only their own guests.
+            </p>
             {floors.length === 0 ? (
               <p className="hint">Add a floor first, then assign it here.</p>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {floors.map((floor) => (
-                  <button
-                    key={floor.id}
-                    type="button"
-                    className="chip"
-                    aria-pressed={selectedFloors.includes(floor.id)}
-                    onClick={() => toggleFloor(floor.id)}
-                  >
-                    <span className="font-mono text-[11px] opacity-70">{floor.number}</span>
-                    {floor.name}
-                    {!floor.active ? <span className="text-[11px] opacity-70">(off)</span> : null}
-                  </button>
-                ))}
-              </div>
+              <ul className="divide-y divide-line rounded-xl border border-line">
+                {floors.map((floor) => {
+                  const current = memberships[floor.id] ?? null;
+                  return (
+                    <li key={floor.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                      <span className="w-7 font-mono text-xs text-muted">{floor.number}</span>
+                      <span className={`min-w-0 flex-1 truncate text-sm font-medium ${floor.active ? "" : "text-muted"}`}>
+                        {floor.name}
+                        {!floor.active ? " (off)" : ""}
+                      </span>
+                      <div className="flex rounded-lg border border-line-strong p-0.5" role="radiogroup" aria-label={`Role on ${floor.name}`}>
+                        {([null, "MEMBER", "ADMIN"] as const).map((option) => (
+                          <button
+                            key={option ?? "none"}
+                            type="button"
+                            role="radio"
+                            aria-checked={current === option}
+                            onClick={() => setFloorRole(floor.id, option)}
+                            className={`h-7 rounded-md px-2.5 text-xs font-semibold transition-colors ${
+                              current === option ? (option ? "bg-ink text-white" : "bg-idle-soft text-ink") : "text-muted hover:text-ink"
+                            }`}
+                          >
+                            {option === "ADMIN" ? "Admin" : option ? FLOOR_ROLE_LABEL[option] : "None"}
+                          </button>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
             {selectedFloors.length === 0 && floors.length > 0 ? (
-              <p className="hint">Pick at least one floor.</p>
+              <p className="hint">Put them on at least one floor.</p>
             ) : null}
           </fieldset>
         ) : null}
 
-        <div>
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="label mb-0">{isNew ? "Password" : "New password"}</span>
-            <button
-              type="button"
-              className="text-xs font-semibold text-signal hover:underline"
-              onClick={() => {
-                setPassword(generatePassword());
-                setRevealKey((key) => key + 1);
-              }}
-            >
-              Generate one
+        {isNew ? (
+          <fieldset>
+            <legend className="label">How do they get a password?</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  ["invite", "Email an invite", "They get a link to set their own password."],
+                  ["password", "Set it myself", "You share the password with them."],
+                ] as const
+              ).map(([value, title, body]) => (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-3 ${
+                    setupMode === value ? "border-signal bg-signal-soft/50 ring-1 ring-signal" : "border-line-strong hover:border-muted"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input type="radio" name="setupMode" checked={setupMode === value} onChange={() => setSetupMode(value)} />
+                    <span className="text-sm font-semibold">{title}</span>
+                  </span>
+                  <span className="text-xs text-muted">{body}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
+
+        {!isNew && person.pending ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-expected/25 bg-expected-soft px-3 py-2.5">
+            <span className="flex-1 text-sm text-expected">
+              <span className="font-semibold">Invite pending.</span> They haven&apos;t set a password yet.
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={resending} onClick={resend}>
+              {resending ? "Sending…" : "Resend invite"}
             </button>
+            {resendNote ? <span className="w-full text-xs text-expected">{resendNote}</span> : null}
           </div>
-          <PasswordInput
-            key={revealKey}
-            initiallyVisible={revealKey > 0}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="new-password"
-            minLength={8}
-            required={isNew}
-            placeholder={isNew ? "At least 8 characters" : "Leave blank to keep the current one"}
-          />
-          <p className="hint">Share it with them privately. They can change it with &ldquo;Forgot password&rdquo;.</p>
-        </div>
+        ) : null}
+
+        {!isNew || setupMode === "password" ? (
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <span className="label mb-0">{isNew ? "Password" : "New password"}</span>
+              <button
+                type="button"
+                className="text-xs font-semibold text-signal hover:underline"
+                onClick={() => {
+                  setPassword(generatePassword());
+                  setRevealKey((key) => key + 1);
+                }}
+              >
+                Generate one
+              </button>
+            </div>
+            <PasswordInput
+              key={revealKey}
+              initiallyVisible={revealKey > 0}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required={isNew}
+              placeholder={isNew ? "At least 8 characters" : "Leave blank to keep the current one"}
+            />
+            <p className="hint">Share it with them privately. They can change it with &ldquo;Forgot password&rdquo;.</p>
+          </div>
+        ) : null}
 
         {!isNew ? (
           <label className={`flex items-center justify-between gap-3 rounded-xl border border-line p-3 ${locked ? "opacity-60" : ""}`}>

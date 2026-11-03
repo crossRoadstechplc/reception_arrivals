@@ -22,7 +22,7 @@ export default async function ReceptionPage({
     db.floor.findMany({ where: { active: true }, orderBy: { number: "asc" } }),
     db.guest.findMany({
       where: { visitDate: toDateOnly(date), floor: { active: true } },
-      include: { floor: true },
+      include: { floor: true, hostUser: { select: { name: true, email: true } } },
       orderBy: [{ floor: { number: "asc" } }, { guestName: "asc" }],
     }),
   ]);
@@ -43,7 +43,10 @@ export default async function ReceptionPage({
           id: guest.id,
           guestName: guest.guestName,
           company: guest.company,
-          hostName: guest.hostName,
+          hostName: guest.hostUser?.name || guest.hostName,
+          hostHasAccount: Boolean(guest.hostUserId),
+          hostNotifiedVia: guest.hostNotifiedVia,
+          arrivedAt: guest.arrivedAt ? guest.arrivedAt.toISOString() : null,
           expectedArrival: guest.expectedArrival,
           status: guest.status,
           notes: guest.notes,

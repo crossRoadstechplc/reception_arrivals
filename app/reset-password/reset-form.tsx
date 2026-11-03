@@ -8,7 +8,7 @@ import { AuthHeading } from "@/components/auth-shell";
 import { Alert } from "@/components/ui";
 import { AlertIcon, CheckIcon } from "@/components/icons";
 
-export function ResetPasswordForm({ token }: { token: string }) {
+export function ResetPasswordForm({ token, invite = false }: { token: string; invite?: boolean }) {
   const [state, action, pending] = useActionState(resetPassword, null);
 
   if (!token) {
@@ -31,7 +31,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-cleared-soft text-cleared">
           <CheckIcon className="size-6" />
         </span>
-        <AuthHeading title="Password saved" />
+        <AuthHeading title={invite ? "You're all set" : "Password saved"} />
         <Link href="/login" className="btn btn-primary btn-lg w-full">
           Sign in
         </Link>
@@ -41,7 +41,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
   return (
     <form action={action} className="rise space-y-4">
-      <AuthHeading title="Choose a new password" />
+      <AuthHeading title={invite ? "Set your password" : "Choose a new password"} />
       <input type="hidden" name="token" value={token} />
       <label className="block">
         <span className="label">New password</span>

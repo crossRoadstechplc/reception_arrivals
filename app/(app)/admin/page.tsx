@@ -12,7 +12,9 @@ export default async function AdminPage() {
   const [floors, users] = await Promise.all([
     db.floor.findMany({
       orderBy: { number: "asc" },
-      include: { _count: { select: { guests: true, assignments: true } } },
+      include: {
+        _count: { select: { guests: true, assignments: { where: { role: "ADMIN" } } } },
+      },
     }),
     db.user.findMany({
       orderBy: { name: "asc" },
@@ -39,7 +41,8 @@ export default async function AdminPage() {
           email: person.email,
           role: person.role,
           active: person.active,
-          floorIds: person.floorAssignments.map((assignment) => assignment.floorId),
+          pending: !person.passwordHash,
+          floors: person.floorAssignments.map((assignment) => ({ floorId: assignment.floorId, role: assignment.role })),
         }))}
       />
     </main>

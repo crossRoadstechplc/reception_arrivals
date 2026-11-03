@@ -2,7 +2,14 @@
 
 Web app for floor guest lists and the ground-floor reception board.
 
-Floor admins add visitors for a date. Reception, on a tablet or a PC, sees every floor and marks a guest cleared for the elevator. A super admin adds floors and people and sets each person's password. Everyone signs in with that email and password. Forgot password sends a reset link through your SMTP server. New floors are added in the admin screen.
+## Who does what
+
+- **Super admin**: adds floors and people, and decides who is admin of which floor.
+- **Floor admin**: sees every guest on their floor and manages the floor team. Adds members by email; new people get an invite email to set their password.
+- **Member**: adds and sees only their own guests. Gets a browser notification and an email when reception checks a guest in.
+- **Reception**: sees every floor on one board, marks guests arrived and cleared, and sees whether the host was alerted.
+
+A person has one account and can be on several floors, with a different role on each (for example admin of floor 6 and member of floor 7).
 
 ## Setup
 
@@ -24,6 +31,16 @@ npm run dev
 5. Open `http://localhost:3000` and sign in with `SEED_SUPER_ADMIN_EMAIL` and `SEED_SUPER_ADMIN_PASSWORD`.
 
 Then add a reception user and a floor admin for the 6th floor from the Admin screen.
+
+## Arrival notifications
+
+Hosts get a browser push notification when their guest arrives. It works in Chrome, Edge, Firefox and Safari (macOS 13+). On iPhone/iPad (iOS 16.4+) the person must first add the site to their Home Screen and open it from there. Every alert is also sent by email, as a record in case the push is missed.
+
+1. Generate keys once: `npx web-push generate-vapid-keys`
+2. Put them in `.env` as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`, and set `VAPID_SUBJECT` to `mailto:` plus a mailbox you own.
+3. Push needs HTTPS in production (`localhost` works for testing).
+
+Keep the same keys forever. Changing them stops every existing subscription; people would have to turn alerts on again.
 
 ## Scripts
 

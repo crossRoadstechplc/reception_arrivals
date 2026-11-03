@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
 import { ROLE_LABEL, type Role } from "@/lib/types";
+import { ArrivalChime } from "@/components/arrival-chime";
 import { BoardIcon, ListIcon, LogoMark, LogoutIcon, SettingsIcon } from "@/components/icons";
 
 const NAV_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -24,6 +25,7 @@ export function AppHeader({
 }) {
   return (
     <header className="sticky top-0 z-30 bg-ink text-console-text shadow-[0_1px_0_rgba(255,255,255,0.06)]">
+      <ArrivalChime />
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-3 md:px-5">
         <Link href={items[0]?.href ?? "/"} className="flex shrink-0 items-center gap-2.5">
           <LogoMark className="size-8" />
