@@ -161,3 +161,18 @@ export async function setReceptionStatus(guestId: string, status: GuestStatus): 
   }
   return { ok: true };
 }
+
+/** Permanently removes a cancelled or no-show guest. Cleared guests stay as a record. */
+export async function deleteGuest(guestId: string): Promise<ActionResult> {
+  const user = await requireRoles(["FLOOR_STAFF", "SUPER_ADMIN"]);
+  const guest = await db.guest.findUnique({ where: { id: guestId } });
+  if (!guest || !canEditGuest(user, guest)) {
+    return { ok: false, error: "Guest not found." };
+  }
+  if (guest.status !== "CANCELLED" && guest.status !== "NO_SHOW") {
+    return { ok: false, error: "Cancel the visit first, then delete it." };
+  }
+  await db.guest.delete({ where: { id: guest.id } });
+  await refreshBoards();
+  return { ok: true };
+}

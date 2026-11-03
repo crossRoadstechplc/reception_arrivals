@@ -26,17 +26,27 @@ self.addEventListener("push", (event) => {
       // Ask open tabs to play the chime. Any tab that has sound on replies "played".
       const played = await askTabsToPlay(appWindows);
 
-      await self.registration.showNotification(title, {
+      const options = {
         body: data.body || "",
         icon: "/icon-192.png",
         badge: "/icon-192.png",
         tag: data.tag,
         renotify: Boolean(data.tag),
         requireInteraction: true,
-        silent: played,
-        vibrate: VIBRATE,
         data: { url: data.url || "/floor" },
-      });
+      };
+      // Browsers reject a notification that is both silent and vibrating,
+      // so only one of the two is ever set.
+      if (played) options.silent = true;
+      else options.vibrate = VIBRATE;
+
+      try {
+        await self.registration.showNotification(title, options);
+      } catch (error) {
+        // Never lose the popup over an unsupported option: retry with the basics.
+        console.error("showNotification failed, retrying plain", error);
+        await self.registration.showNotification(title, { body: options.body, icon: options.icon, data: options.data });
+      }
     })(),
   );
 });

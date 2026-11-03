@@ -45,6 +45,8 @@ export function PushPrompt() {
       if (Notification.permission === "denied") return setState("blocked");
       try {
         const registration = await navigator.serviceWorker.register("/sw.js");
+        // Pick up a newer sw.js right away instead of waiting for the browser.
+        void registration.update().catch(() => {});
         const existing = await registration.pushManager.getSubscription();
         if (cancelled) return;
         if (existing && Notification.permission === "granted") {

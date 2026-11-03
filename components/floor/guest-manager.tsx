@@ -2,11 +2,12 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
+import { deleteGuest, saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
 import { formatClock } from "@/lib/dates";
 import { FLOOR_ROLE_LABEL, OTHER_HOST, type FloorRole, type GuestStatus } from "@/lib/types";
 import {
   Alert,
+  ConfirmDialog,
   DateHeading,
   DateNav,
   EmptyState,
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
 import { PushPrompt } from "@/components/push-prompt";
-import { BuildingIcon, NoteIcon, PencilIcon, PlusIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
+import { BuildingIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
 export type FloorGuest = {
   id: string;
@@ -62,6 +63,8 @@ export function GuestManager({
   const [editing, setEditing] = useState<FloorGuest | null | "new">(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<FloorGuest | null>(null);
+  const [deletePending, startDelete] = useTransition();
   const [, startTransition] = useTransition();
   const { toast, show, dismiss } = useToast();
   const floor = floors.find((item) => item.id === floorId);
@@ -107,6 +110,22 @@ export function GuestManager({
           onClick: () => changeStatus(guest, status === "CANCELLED" ? "EXPECTED" : "CANCELLED", true),
         },
       });
+    });
+  }
+
+  function confirmDelete() {
+    if (!deleting) return;
+    const guest = deleting;
+    setError(null);
+    startDelete(async () => {
+      const result = await deleteGuest(guest.id);
+      setDeleting(null);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+      show({ message: `${guest.guestName} deleted` });
     });
   }
 
@@ -271,6 +290,17 @@ export function GuestManager({
                           Restore
                         </button>
                       ) : null}
+                      {inactive ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm text-danger hover:bg-danger-soft hover:text-danger"
+                          disabled={pending}
+                          onClick={() => setDeleting(guest)}
+                        >
+                          <TrashIcon className="size-3.5" />
+                          Delete
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -291,6 +321,18 @@ export function GuestManager({
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
+        />
+      ) : null}
+
+      {deleting ? (
+        <ConfirmDialog
+          title={`Delete ${deleting.guestName}?`}
+          body="This removes the guest from the list for good. It can't be undone."
+          confirmLabel="Delete guest"
+          danger
+          pending={deletePending}
+          onConfirm={confirmDelete}
+          onClose={() => setDeleting(null)}
         />
       ) : null}
 
