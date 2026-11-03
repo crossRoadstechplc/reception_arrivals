@@ -65,7 +65,19 @@ export function formatOfficeDate(iso: string) {
   }).format(date);
 }
 
+/** A moment shown as office time in 12-hour format, e.g. "2:30 PM" (EAT by default). */
 export function formatClock(value: Date | string, timeZone = officeTimeZone()) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
+/** A moment as office time in 24-hour "HH:MM", for comparing with stored times. */
+export function clock24(value: Date | string, timeZone = officeTimeZone()) {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("en-GB", {
     timeZone,
@@ -73,4 +85,14 @@ export function formatClock(value: Date | string, timeZone = officeTimeZone()) {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(date);
+}
+
+/** A stored "HH:MM" time of day shown in 12-hour format, e.g. "14:30" -> "2:30 PM". */
+export function formatTimeOfDay(value: string | null | undefined) {
+  const match = value?.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hour12}:${match[2]} ${period}`;
 }

@@ -4,7 +4,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteGuest, saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
-import { formatClock } from "@/lib/dates";
+import { formatClock, formatTimeOfDay } from "@/lib/dates";
 import { FLOOR_ROLE_LABEL, OTHER_HOST, type FloorRole, type GuestStatus } from "@/lib/types";
 import {
   Alert,
@@ -227,8 +227,8 @@ export function GuestManager({
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <div className={`w-14 shrink-0 pt-0.5 font-mono text-base font-medium ${inactive ? "text-muted" : ""}`}>
-                        {guest.expectedArrival ?? "—:—"}
+                      <div className={`w-[4.75rem] shrink-0 pt-0.5 font-mono text-sm font-medium whitespace-nowrap ${inactive ? "text-muted" : ""}`}>
+                        {formatTimeOfDay(guest.expectedArrival) ?? "No time"}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -263,7 +263,7 @@ export function GuestManager({
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-1.5 pl-[4.25rem] sm:pl-0">
+                    <div className="flex shrink-0 gap-1.5 pl-[5.5rem] sm:pl-0">
                       {guest.status !== "CLEARED" && !inactive ? (
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(guest)}>
                           <PencilIcon className="size-3.5" />

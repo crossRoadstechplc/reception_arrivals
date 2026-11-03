@@ -4,7 +4,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setReceptionStatus } from "@/lib/actions/guests";
-import { formatClock } from "@/lib/dates";
+import { clock24, formatClock, formatTimeOfDay } from "@/lib/dates";
 import { type GuestStatus } from "@/lib/types";
 import {
   Alert,
@@ -93,7 +93,7 @@ export function ReceptionBoard({
 
   // Current office time, used to flag late guests. Set on the client only.
   useEffect(() => {
-    const tick = () => setNow(formatClock(new Date(), timeZone));
+    const tick = () => setNow(clock24(new Date(), timeZone));
     tick();
     const timer = window.setInterval(tick, 30_000);
     return () => window.clearInterval(timer);
@@ -356,9 +356,9 @@ function GuestRow({
     <li className={`px-4 py-3 ${flash ? "flash" : ""} ${done ? "bg-panel-2/60" : ""}`}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div className="w-14 shrink-0 pt-0.5">
-            <div className={`font-mono text-base font-medium ${done ? "text-muted" : "text-ink"}`}>
-              {guest.expectedArrival ?? "—:—"}
+          <div className="w-[4.75rem] shrink-0 pt-0.5">
+            <div className={`font-mono text-sm font-medium whitespace-nowrap ${done ? "text-muted" : "text-ink"}`}>
+              {formatTimeOfDay(guest.expectedArrival) ?? "No time"}
             </div>
             {late ? <div className="text-[11px] font-bold text-signal uppercase">Late</div> : null}
           </div>
@@ -385,7 +385,7 @@ function GuestRow({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-[4.25rem] md:pl-0">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-[5.5rem] md:pl-0">
           {guest.status === "EXPECTED" ? (
             <button type="button" className="btn btn-secondary h-11" disabled={pending} onClick={() => onStatus("ARRIVED")}>
               <CheckIcon className="size-4" />
