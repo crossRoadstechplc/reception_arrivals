@@ -53,7 +53,7 @@ export default async function FloorTeamPage({
   return (
     <main className="min-h-dvh bg-paper">
       <AppHeader user={user} items={navItems(user.role, "floor")} />
-      <FloorTabs floorId={floor.id} current="team" multiFloor={visibleFloorCount > 1} />
+      <FloorTabs floorId={floor.id} current="team" multiFloor={visibleFloorCount > 1} showTeam />
       <TeamManager
         floor={{ id: floor.id, name: floorLabel(floor), number: floor.number }}
         floors={managed.map((f) => ({ id: f.id, name: floorLabel(f), number: f.number }))}

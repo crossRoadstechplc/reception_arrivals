@@ -25,6 +25,8 @@ import { BuildingIcon, CarIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoI
 
 export type FloorGuest = {
   id: string;
+  /** ISO date of the visit. */
+  visitDate: string;
   guestName: string;
   company: string | null;
   hostName: string;
@@ -39,7 +41,7 @@ export type FloorGuest = {
 };
 
 type FloorOption = { id: string; name: string; number: number; role: FloorRole };
-type HostOption = { id: string; name: string };
+export type HostOption = { id: string; name: string };
 
 export function GuestManager({
   date,
@@ -346,7 +348,7 @@ export function GuestManager({
   );
 }
 
-function GuestForm({
+export function GuestForm({
   date,
   floorId,
   floorName,

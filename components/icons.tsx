@@ -123,6 +123,13 @@ export const BuildingIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const CalendarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </Svg>
+);
+
 export const PencilIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 20h4L19 9l-4-4L4 16z" />

@@ -116,3 +116,31 @@ export function timeOfDayMinutes(value: string | null | undefined) {
   const match = value?.match(/^(\d{1,2}):(\d{2})$/);
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
+
+const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** 0 = Sunday … 6 = Saturday, for a calendar date. */
+export function weekdayOf(iso: string) {
+  return new Date(`${iso}T12:00:00.000Z`).getUTCDay();
+}
+
+/** The Monday of the week a date falls in. */
+export function mondayOf(iso: string) {
+  return shiftISO(iso, -((weekdayOf(iso) + 6) % 7));
+}
+
+/** { weekday: "Mon", day: 16, month: "Nov", year: 2026 } */
+export function dateParts(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return { weekday: SHORT_DAYS[weekdayOf(iso)], day, month: SHORT_MONTHS[month - 1], year };
+}
+
+/** "16 – 20 Nov 2026", "30 Nov – 4 Dec 2026" or "29 Dec 2026 – 2 Jan 2027". */
+export function formatDateRange(start: string, end: string) {
+  const a = dateParts(start);
+  const b = dateParts(end);
+  if (a.year !== b.year) return `${a.day} ${a.month} ${a.year} – ${b.day} ${b.month} ${b.year}`;
+  if (a.month !== b.month) return `${a.day} ${a.month} – ${b.day} ${b.month} ${b.year}`;
+  return `${a.day} – ${b.day} ${b.month} ${b.year}`;
+}
