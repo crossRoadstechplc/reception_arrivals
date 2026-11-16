@@ -4,6 +4,7 @@ import '../config.dart';
 import '../main.dart';
 import '../notifications.dart';
 import '../theme.dart';
+import '../updater.dart';
 import '../widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -12,7 +13,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([session, alerts]),
+      listenable: Listenable.merge([session, alerts, updater]),
       builder: (context, _) {
         final user = session.user;
         return ListView(
@@ -70,6 +71,30 @@ class SettingsScreen extends StatelessWidget {
             const SizedBox(height: 16),
             const _SectionTitle('Arrival alerts'),
             const _AlertsCard(),
+            const SizedBox(height: 16),
+            const _SectionTitle('App'),
+            Card(
+              child: Column(
+                children: [
+                  if (updater.available != null)
+                    ListTile(
+                      leading: const Icon(Icons.system_update, color: AppColors.signal),
+                      title: Text('Update to ${updater.available!.versionName}',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text('A newer version is ready to install.'),
+                      onTap: () => updater.showUpdateDialog(context, updater.available!),
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: Text('Version ${updater.installedVersion} (${updater.installedBuild})'),
+                    trailing: TextButton(
+                      onPressed: () => updater.checkAndPrompt(() => context, force: true),
+                      child: const Text('Check for updates'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
               onPressed: () async {

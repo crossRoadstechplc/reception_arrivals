@@ -6,12 +6,17 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'session.dart';
 import 'theme.dart';
+import 'updater.dart';
 
 final session = Session();
+
+/// Lets services (like the updater) show dialogs from anywhere.
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await alerts.init();
+  await updater.init();
   session.onSignedIn = alerts.attach;
   session.onSigningOut = alerts.detach;
   await session.restore();
@@ -31,7 +36,11 @@ class _ArrivalDeskAppState extends State<ArrivalDeskApp> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Offer a newer version, if there is one, once the first screen is up.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
   }
+
+  void _checkForUpdate() => updater.checkAndPrompt(() => navigatorKey.currentContext);
 
   @override
   void dispose() {
@@ -42,9 +51,12 @@ class _ArrivalDeskAppState extends State<ArrivalDeskApp> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Back in the app: reload guests and re-check alert permission (it may have changed in Settings).
-    if (state == AppLifecycleState.resumed && session.signedIn) {
-      requestRefresh();
-      alerts.recheck();
+    if (state == AppLifecycleState.resumed) {
+      _checkForUpdate();
+      if (session.signedIn) {
+        requestRefresh();
+        alerts.recheck();
+      }
     }
   }
 
@@ -52,6 +64,7 @@ class _ArrivalDeskAppState extends State<ArrivalDeskApp> with WidgetsBindingObse
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Arrival Desk',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       home: ListenableBuilder(

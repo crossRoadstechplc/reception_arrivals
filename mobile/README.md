@@ -21,15 +21,34 @@ flutter run                     # uses the live site (see lib/config.dart)
 flutter run --dart-define=API_URL=http://10.0.2.2:3000   # local dev server, Android emulator
 ```
 
-Release APK for installing on phones:
+## Release a new version (phones update themselves)
 
-```bash
-flutter build apk --release      # build/app/outputs/flutter-apk/app-release.apk
+From this PC, in `mobile/`:
+
+```powershell
+.\release.ps1                                   # 1.0.3 -> 1.0.4, "What's new" from git log
+.\release.ps1 -Notes "Calendar shows parking"   # your own "What's new"
+.\release.ps1 -Bump minor                       # 1.0.4 -> 1.1.0
 ```
 
-> Release builds are signed with the debug key for now. Before publishing to
-> Google Play, create an upload key and add a `signingConfig` in
-> `android/app/build.gradle.kts`.
+It bumps the version in `pubspec.yaml`, builds the signed APK, commits + tags
+(`app-v1.0.4+5`) + pushes, and creates a GitHub release with the APK and its
+sha256. The website's `/api/mobile/app-version` reads the newest release; the app
+checks it when it opens (and in *Settings › Check for updates*), shows
+**Update available**, downloads the APK, checks the sha256, and Android asks
+the person to tap **Update**. The first time, Android also asks them to allow
+"Install unknown apps" for Arrival Desk.
+
+One-time setup:
+
+- GitHub CLI: `winget install GitHub.cli`, then `gh auth login`.
+- **The signing key**: `android/key.properties` + `android/upload-keystore.jks`
+  (git-ignored). Every version must be signed with this same key, or phones
+  refuse the update. **Back both files up** (password manager / company drive).
+  If they're lost, every phone has to uninstall and reinstall the app.
+
+Builds without `key.properties` (e.g. a fresh clone) fall back to the debug key;
+they run fine but can't update an installed release.
 
 ## Turn on phone alerts (Firebase)
 
