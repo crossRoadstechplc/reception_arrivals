@@ -2,7 +2,15 @@ import type { Metadata } from "next";
 import { AppHeader } from "@/components/app-header";
 import { ReceptionBoard } from "@/components/reception/reception-board";
 import { db } from "@/lib/db";
-import { isISODate, officeTimeZone, officeTodayISO, toDateOnly } from "@/lib/dates";
+import {
+  formatClock,
+  formatOfficeDate,
+  formatTimeOfDay,
+  isISODate,
+  officeMinutesNow,
+  officeTodayISO,
+  toDateOnly,
+} from "@/lib/dates";
 import { requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
 
@@ -38,7 +46,8 @@ export default async function ReceptionPage({
       <ReceptionBoard
         date={date}
         today={today}
-        timeZone={officeTimeZone()}
+        dateLabel={formatOfficeDate(date)}
+        officeMinutes={officeMinutesNow()}
         floors={floors.map((floor) => ({
           id: floor.id,
           name: floor.name,
@@ -51,19 +60,21 @@ export default async function ReceptionPage({
           hostName: guest.hostUser?.name || guest.hostName,
           hostHasAccount: Boolean(guest.hostUserId),
           hostNotifiedVia: guest.hostNotifiedVia,
-          arrivedAt: guest.arrivedAt ? guest.arrivedAt.toISOString() : null,
+          // All time text is made here on the server so every device shows the same thing.
+          expectedLabel: formatTimeOfDay(guest.expectedArrival),
+          checkedInAt: (guest.arrivedAt ?? guest.clearedAt)?.toISOString() ?? null,
+          checkedInLabel: guest.arrivedAt ?? guest.clearedAt ? formatClock((guest.arrivedAt ?? guest.clearedAt)!) : null,
+          createdLabel: formatClock(guest.createdAt),
+          notifiedLabel: guest.hostNotifiedAt ? formatClock(guest.hostNotifiedAt) : null,
           expectedArrival: guest.expectedArrival,
           status: guest.status,
           notes: guest.notes,
-          clearedAt: guest.clearedAt ? guest.clearedAt.toISOString() : null,
           floorId: guest.floorId,
           floorName: guest.floor.name,
           floorNumber: guest.floor.number,
           deskNote: guest.deskNote,
-          createdAt: guest.createdAt.toISOString(),
           createdByName: guest.createdBy?.name || guest.createdBy?.email || null,
           arrivedByName: guest.arrivedBy?.name || guest.arrivedBy?.email || null,
-          hostNotifiedAt: guest.hostNotifiedAt ? guest.hostNotifiedAt.toISOString() : null,
         }))}
       />
     </main>

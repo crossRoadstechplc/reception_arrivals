@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { formatOfficeDate, shiftISO } from "@/lib/dates";
+import { shiftISO } from "@/lib/dates";
 import { STATUS_LABEL, type GuestStatus } from "@/lib/types";
 import { AlertIcon, CheckIcon, ChevronLeft, ChevronRight, XIcon } from "@/components/icons";
 
@@ -371,7 +371,8 @@ export function dayLabel(date: string, today: string) {
   return date < today ? "Past day" : "Upcoming";
 }
 
-export function DateHeading({ date, today, title }: { date: string; today: string; title?: string }) {
+/** `label` is the date text made on the server, e.g. "Monday 16 November". */
+export function DateHeading({ date, today, label, title }: { date: string; today: string; label: string; title?: string }) {
   return (
     <div className="min-w-0">
       <p className="text-xs font-semibold tracking-[0.14em] text-signal uppercase">
@@ -379,7 +380,7 @@ export function DateHeading({ date, today, title }: { date: string; today: strin
         {dayLabel(date, today)}
       </p>
       <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight md:text-[1.75rem]">
-        {formatOfficeDate(date)}
+        {label}
       </h1>
     </div>
   );

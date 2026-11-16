@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDeskNote, setReceptionStatus } from "@/lib/actions/guests";
-import { clock24, formatClock, formatTimeOfDay } from "@/lib/dates";
+import { timeOfDayMinutes } from "@/lib/dates";
 import { type GuestStatus } from "@/lib/types";
 import { Alert, DateHeading, DateNav, Drawer, EmptyState, StatusBadge, Toast, useToast } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
@@ -17,15 +17,17 @@ export type BoardGuest = {
   hostName: string;
   hostHasAccount: boolean;
   hostNotifiedVia: string | null;
-  hostNotifiedAt: string | null;
-  arrivedAt: string | null;
+  /** Time text is made on the server so every device shows the same thing. */
+  expectedLabel: string | null;
+  checkedInAt: string | null;
+  checkedInLabel: string | null;
+  createdLabel: string;
+  notifiedLabel: string | null;
   arrivedByName: string | null;
   expectedArrival: string | null;
   status: GuestStatus;
   notes: string | null;
   deskNote: string | null;
-  clearedAt: string | null;
-  createdAt: string;
   createdByName: string | null;
   floorId: string;
   floorName: string;
@@ -47,26 +49,25 @@ function tabOf(status: GuestStatus): Tab {
   return "expected";
 }
 
-/** When the guest was checked in (old two-step records may only have one of these). */
-function checkedInAt(guest: BoardGuest) {
-  return guest.arrivedAt ?? guest.clearedAt;
-}
-
 const byExpectedTime = (a: BoardGuest, b: BoardGuest) =>
   (a.expectedArrival ?? "99:99").localeCompare(b.expectedArrival ?? "99:99") || a.guestName.localeCompare(b.guestName);
 
-const byCheckInDesc = (a: BoardGuest, b: BoardGuest) => (checkedInAt(b) ?? "").localeCompare(checkedInAt(a) ?? "");
+const byCheckInDesc = (a: BoardGuest, b: BoardGuest) => (b.checkedInAt ?? "").localeCompare(a.checkedInAt ?? "");
 
 export function ReceptionBoard({
   date,
   today,
-  timeZone,
+  dateLabel,
+  officeMinutes,
   guests,
   floors,
 }: {
   date: string;
   today: string;
-  timeZone: string;
+  /** e.g. "Monday 16 November", made on the server. */
+  dateLabel: string;
+  /** Office time (minutes since midnight) when the server built this page. */
+  officeMinutes: number;
   guests: BoardGuest[];
   floors: FloorOption[];
 }) {
@@ -80,17 +81,20 @@ export function ReceptionBoard({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState({ base: officeMinutes, minutes: 0 });
   const [, startTransition] = useTransition();
   const { toast, show, dismiss } = useToast();
 
-  // Current office time (24h) to flag late guests. Client only.
+  // Office time for the "Late" tag: the server's time plus how long this page
+  // has been open (a steady timer), so a wrong device clock can't affect it.
   useEffect(() => {
-    const tick = () => setNow(clock24(new Date(), timeZone));
-    tick();
-    const timer = window.setInterval(tick, 30_000);
+    const started = performance.now();
+    const timer = window.setInterval(() => {
+      setElapsed({ base: officeMinutes, minutes: Math.floor((performance.now() - started) / 60_000) });
+    }, 30_000);
     return () => window.clearInterval(timer);
-  }, [timeZone]);
+  }, [officeMinutes]);
+  const nowMinutes = officeMinutes + (elapsed.base === officeMinutes ? elapsed.minutes : 0);
 
   // Press "/" anywhere to jump to search.
   useEffect(() => {
@@ -149,7 +153,8 @@ export function ReceptionBoard({
   }
 
   function isLate(guest: BoardGuest) {
-    return isToday && now !== null && guest.status === "EXPECTED" && !!guest.expectedArrival && guest.expectedArrival < now;
+    const expected = timeOfDayMinutes(guest.expectedArrival);
+    return isToday && guest.status === "EXPECTED" && expected !== null && expected < nowMinutes;
   }
 
   function updateStatus(guest: BoardGuest, next: GuestStatus, opts: { undo?: boolean } = {}) {
@@ -191,7 +196,7 @@ export function ReceptionBoard({
       {/* Title row */}
       <section className="flex flex-wrap items-end gap-3">
         <div className="mr-auto min-w-0">
-          <DateHeading date={date} today={today} title="Reception" />
+          <DateHeading date={date} today={today} label={dateLabel} title="Reception" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator live={live} />
@@ -315,7 +320,6 @@ export function ReceptionBoard({
               <VisitorRow
                 key={guest.id}
                 guest={guest}
-                timeZone={timeZone}
                 late={isLate(guest)}
                 pending={pendingId === guest.id}
                 flash={flashId === guest.id}
@@ -336,7 +340,6 @@ export function ReceptionBoard({
         <VisitorPanel
           key={selected.id}
           guest={selected}
-          timeZone={timeZone}
           late={isLate(selected)}
           pending={pendingId === selected.id}
           onClose={() => setSelectedId(null)}
@@ -355,7 +358,6 @@ export function ReceptionBoard({
 
 function VisitorRow({
   guest,
-  timeZone,
   late,
   pending,
   flash,
@@ -363,7 +365,6 @@ function VisitorRow({
   onCheckIn,
 }: {
   guest: BoardGuest;
-  timeZone: string;
   late: boolean;
   pending: boolean;
   flash: boolean;
@@ -371,7 +372,6 @@ function VisitorRow({
   onCheckIn: () => void;
 }) {
   const tab = tabOf(guest.status);
-  const checkedAt = checkedInAt(guest);
 
   return (
     <li
@@ -384,7 +384,7 @@ function VisitorRow({
         {/* Time */}
         <div className="self-start pt-0.5 lg:self-center lg:pt-0">
           <div className="font-mono text-sm font-medium whitespace-nowrap">
-            {formatTimeOfDay(guest.expectedArrival) ?? <span className="text-muted">Any time</span>}
+            {guest.expectedLabel ?? <span className="text-muted">Any time</span>}
           </div>
           {late ? <div className="text-[11px] font-bold text-signal uppercase">Late</div> : null}
         </div>
@@ -442,12 +442,12 @@ function VisitorRow({
           {tab === "expected" ? (
             <button type="button" className="btn btn-go h-11 w-full px-5 text-[15px] lg:w-auto lg:min-w-36" disabled={pending} onClick={onCheckIn}>
               <CheckIcon className="size-4" />
-              {pending ? "Checking in…" : "Check in"}
+              {pending ? "Saving…" : "Arrived"}
             </button>
           ) : tab === "in" ? (
             <div className="text-right">
               <p className="text-sm font-semibold text-cleared">
-                {checkedAt ? `Checked in ${formatClock(checkedAt, timeZone)}` : "Checked in"}
+                {guest.checkedInLabel ? `Checked in ${guest.checkedInLabel}` : "Checked in"}
               </p>
               <HostAlert guest={guest} compact />
             </div>
@@ -491,7 +491,6 @@ function HostAlert({ guest, compact = false }: { guest: BoardGuest; compact?: bo
 
 function VisitorPanel({
   guest,
-  timeZone,
   late,
   pending,
   onClose,
@@ -500,7 +499,6 @@ function VisitorPanel({
   onSaved,
 }: {
   guest: BoardGuest;
-  timeZone: string;
   late: boolean;
   pending: boolean;
   onClose: () => void;
@@ -509,30 +507,29 @@ function VisitorPanel({
   onSaved: (message: string) => void;
 }) {
   const tab = tabOf(guest.status);
-  const checkedAt = checkedInAt(guest);
 
   const timeline: { label: string; detail: string | null; done: boolean }[] = [
     {
       label: "Added to the list",
-      detail: `${formatClock(guest.createdAt, timeZone)}${guest.createdByName ? ` by ${guest.createdByName}` : ""}`,
+      detail: `${guest.createdLabel}${guest.createdByName ? ` by ${guest.createdByName}` : ""}`,
       done: true,
     },
     {
       label: "Checked in",
-      detail: checkedAt
-        ? `${formatClock(checkedAt, timeZone)}${guest.arrivedByName ? ` by ${guest.arrivedByName}` : ""}`
+      detail: guest.checkedInLabel
+        ? `${guest.checkedInLabel}${guest.arrivedByName ? ` by ${guest.arrivedByName}` : ""}`
         : null,
-      done: Boolean(checkedAt) && tab === "in",
+      done: Boolean(guest.checkedInLabel) && tab === "in",
     },
     {
       label: "Host alerted",
       detail:
-        guest.hostNotifiedAt && guest.hostNotifiedVia
-          ? `${formatClock(guest.hostNotifiedAt, timeZone)} · ${ALERT_LABEL[guest.hostNotifiedVia] ?? guest.hostNotifiedVia}`
+        guest.notifiedLabel && guest.hostNotifiedVia
+          ? `${guest.notifiedLabel} · ${ALERT_LABEL[guest.hostNotifiedVia] ?? guest.hostNotifiedVia}`
           : guest.hostHasAccount
             ? null
             : "Host isn't on Arrival Desk",
-      done: Boolean(guest.hostNotifiedAt) && guest.hostNotifiedVia !== "none",
+      done: Boolean(guest.notifiedLabel) && guest.hostNotifiedVia !== "none",
     },
   ];
 
@@ -554,7 +551,7 @@ function VisitorPanel({
           <>
             <button type="button" className="btn btn-go btn-lg flex-1" disabled={pending} onClick={onCheckIn}>
               <CheckIcon className="size-5" />
-              {pending ? "Checking in…" : "Check in"}
+              {pending ? "Saving…" : "Arrived"}
             </button>
             <button type="button" className="btn btn-ghost btn-lg" disabled={pending} onClick={() => onStatus("NO_SHOW")}>
               No-show
@@ -577,7 +574,7 @@ function VisitorPanel({
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div>
             <dt className="text-xs font-semibold text-muted">Expected</dt>
-            <dd className="mt-0.5 font-medium">{formatTimeOfDay(guest.expectedArrival) ?? "Any time"}</dd>
+            <dd className="mt-0.5 font-medium">{guest.expectedLabel ?? "Any time"}</dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-muted">Floor</dt>

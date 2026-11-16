@@ -32,6 +32,9 @@ export function PushPrompt() {
   const [message, setMessage] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [sound, setSound] = useState(true);
+  const [mobile, setMobile] = useState(false);
+  const [ios, setIos] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -40,6 +43,8 @@ export function PushPrompt() {
       if (!publicKey) return setState("hidden");
       setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
       setSound(soundEnabled());
+      setMobile(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || isIos());
+      setIos(isIos());
       const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
       if (!supported) return setState(isIos() && !isStandalone() ? "ios-install" : "unsupported");
       if (Notification.permission === "denied") return setState("blocked");
@@ -154,7 +159,21 @@ export function PushPrompt() {
         <button type="button" className="text-xs font-semibold text-muted hover:text-ink" disabled={pending} onClick={turnOff}>
           Turn off
         </button>
+        {mobile ? (
+          <>
+            <span className="text-line-strong">·</span>
+            <button
+              type="button"
+              className="text-xs font-semibold text-muted hover:text-ink"
+              aria-expanded={showHelp}
+              onClick={() => setShowHelp((v) => !v)}
+            >
+              Not getting alerts on this phone?
+            </button>
+          </>
+        ) : null}
         {message ? <span className="text-xs text-muted">{message}</span> : null}
+        {showHelp ? <PhoneHelp ios={ios} /> : null}
       </div>
     );
   }
@@ -219,5 +238,37 @@ function BellIcon({ className }: { className?: string }) {
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
       <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
     </svg>
+  );
+}
+
+/** Phone settings that silently block alerts even when the site is allowed. */
+function PhoneHelp({ ios }: { ios: boolean }) {
+  return (
+    <div className="mt-1 w-full rounded-xl border border-line bg-panel p-3 text-xs leading-relaxed text-ink-soft">
+      {ios ? (
+        <ol className="list-decimal space-y-1 pl-4">
+          <li>Alerts only work when Arrival Desk is opened from its Home Screen icon (Share, then Add to Home Screen).</li>
+          <li>
+            Open <b>Settings, then Notifications, then Arrival Desk</b> and make sure Allow Notifications, Banners and
+            Sounds are on.
+          </li>
+          <li>Turn off Focus / Do Not Disturb, or allow Arrival Desk in it.</li>
+          <li>Tap &ldquo;Send test&rdquo; again.</li>
+        </ol>
+      ) : (
+        <ol className="list-decimal space-y-1 pl-4">
+          <li>
+            Open <b>Settings, then Apps, then Chrome, then Notifications</b>. Make sure notifications are on, and that
+            this site&apos;s entry is set to <b>Alert / Pop on screen</b> with sound.
+          </li>
+          <li>
+            Open <b>Settings, then Apps, then Chrome, then Battery</b> and choose <b>Unrestricted</b> (or turn off
+            battery optimisation for Chrome). Many phones block alerts while the screen is off otherwise.
+          </li>
+          <li>Turn off Do Not Disturb, or allow Chrome in it.</li>
+          <li>Tap &ldquo;Send test&rdquo; again. The alert should appear even with the screen locked.</li>
+        </ol>
+      )}
+    </div>
   );
 }

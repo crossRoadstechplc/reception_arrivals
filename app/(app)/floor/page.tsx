@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { FloorTabs } from "@/components/floor/floor-tabs";
 import { GuestManager } from "@/components/floor/guest-manager";
 import { db } from "@/lib/db";
-import { isISODate, officeTimeZone, officeTodayISO, toDateOnly } from "@/lib/dates";
+import { formatClock, formatOfficeDate, formatTimeOfDay, isISODate, officeTodayISO, toDateOnly } from "@/lib/dates";
 import { floorRoleOf, requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
 import type { FloorRole } from "@/lib/types";
@@ -82,7 +82,7 @@ export default async function FloorPage({
       <GuestManager
         date={date}
         today={today}
-        timeZone={officeTimeZone()}
+        dateLabel={formatOfficeDate(date)}
         floorId={floorId}
         floors={floors}
         myRole={myRole}
@@ -97,8 +97,9 @@ export default async function FloorPage({
           expectedArrival: guest.expectedArrival,
           status: guest.status,
           notes: guest.notes,
-          arrivedAt: guest.arrivedAt ? guest.arrivedAt.toISOString() : null,
-          clearedAt: guest.clearedAt ? guest.clearedAt.toISOString() : null,
+          // Time text is made on the server so every device shows the same thing.
+          expectedLabel: formatTimeOfDay(guest.expectedArrival),
+          checkedInLabel: guest.arrivedAt ?? guest.clearedAt ? formatClock((guest.arrivedAt ?? guest.clearedAt)!) : null,
         }))}
       />
     </main>

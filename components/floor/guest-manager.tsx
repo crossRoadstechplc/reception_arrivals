@@ -4,7 +4,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteGuest, saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
-import { formatClock, formatTimeOfDay } from "@/lib/dates";
+import { TimeField } from "@/components/time-field";
 import { FLOOR_ROLE_LABEL, OTHER_HOST, type FloorRole, type GuestStatus } from "@/lib/types";
 import {
   Alert,
@@ -31,8 +31,8 @@ export type FloorGuest = {
   expectedArrival: string | null;
   status: GuestStatus;
   notes: string | null;
-  arrivedAt: string | null;
-  clearedAt: string | null;
+  expectedLabel: string | null;
+  checkedInLabel: string | null;
 };
 
 type FloorOption = { id: string; name: string; number: number; role: FloorRole };
@@ -41,7 +41,7 @@ type HostOption = { id: string; name: string };
 export function GuestManager({
   date,
   today,
-  timeZone,
+  dateLabel,
   floors,
   floorId,
   myRole,
@@ -51,7 +51,7 @@ export function GuestManager({
 }: {
   date: string;
   today: string;
-  timeZone: string;
+  dateLabel: string;
   floors: FloorOption[];
   floorId: string | null;
   myRole: FloorRole | null;
@@ -136,7 +136,7 @@ export function GuestManager({
       {/* Title row */}
       <section className="flex flex-wrap items-end gap-3">
         <div className="mr-auto min-w-0">
-          <DateHeading date={date} today={today} title={heading} />
+          <DateHeading date={date} today={today} label={dateLabel} title={heading} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator live={live} />
@@ -226,7 +226,7 @@ export function GuestManager({
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                       <div className={`w-[4.75rem] shrink-0 pt-0.5 font-mono text-sm font-medium whitespace-nowrap ${inactive ? "text-muted" : ""}`}>
-                        {formatTimeOfDay(guest.expectedArrival) ?? "No time"}
+                        {guest.expectedLabel ?? "No time"}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -242,9 +242,9 @@ export function GuestManager({
                               Host: <span className="font-medium text-ink-soft">{mine ? "You" : guest.hostName}</span>
                             </>
                           ) : null}
-                          {(guest.status === "ARRIVED" || guest.status === "CLEARED") && (guest.arrivedAt ?? guest.clearedAt) ? (
+                          {(guest.status === "ARRIVED" || guest.status === "CLEARED") && guest.checkedInLabel ? (
                             <span className="font-semibold text-cleared">
-                              {isAdmin ? " · " : ""}Checked in at {formatClock((guest.arrivedAt ?? guest.clearedAt)!, timeZone)}
+                              {isAdmin ? " · " : ""}Checked in at {guest.checkedInLabel}
                             </span>
                           ) : null}
                         </p>
@@ -396,7 +396,6 @@ function GuestForm({
         const form = formRef.current;
         if (form) {
           (form.elements.namedItem("guestName") as HTMLInputElement).value = "";
-          (form.elements.namedItem("expectedArrival") as HTMLInputElement).value = "";
           (form.elements.namedItem("notes") as HTMLTextAreaElement).value = "";
         }
         setAddedCount((count) => count + 1);
@@ -505,7 +504,8 @@ function GuestForm({
             <span className="label">
               Expected time <span className="font-normal text-muted">(optional)</span>
             </span>
-            <input className="field" type="time" name="expectedArrival" defaultValue={guest?.expectedArrival ?? ""} />
+            {/* Keyed so "Save & add another" clears it for the next guest. */}
+            <TimeField key={addedCount} name="expectedArrival" defaultValue={guest?.expectedArrival} />
           </label>
         </div>
         <label>

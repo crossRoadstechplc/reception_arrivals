@@ -1,10 +1,15 @@
 // Arrival Desk service worker: shows "your guest has arrived" notifications.
 //
-// Sound: browsers don't allow a custom sound on a notification. So when an
-// Arrival Desk tab is open, we ask it to play our own chime and keep the
-// notification silent. When no tab is open, the device's normal sound plays.
+// Sound: browsers don't allow a custom sound on a notification. On a computer,
+// if Arrival Desk is visible on screen, that tab plays our chime and the popup
+// stays silent. Everywhere else (phones, hidden tabs, closed browser) the popup
+// uses the device's normal sound, so it shows as a proper heads-up alert.
 
-const VIBRATE = [120, 80, 120, 80, 320]; // Android only: short-short-long
+const VERSION = "3";
+const VIBRATE = [120, 80, 120, 80, 320]; // Android: short-short-long
+
+// Phones only show a heads-up banner for non-silent notifications.
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(self.navigator.userAgent);
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -16,40 +21,42 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { title: "Arrival Desk", body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "Arrival Desk";
-
-  event.waitUntil(
-    (async () => {
-      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const appWindows = windows.filter((client) => client.url.startsWith(self.location.origin));
-
-      // Ask open tabs to play the chime. Any tab that has sound on replies "played".
-      const played = await askTabsToPlay(appWindows);
-
-      const options = {
-        body: data.body || "",
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
-        tag: data.tag,
-        renotify: Boolean(data.tag),
-        requireInteraction: true,
-        data: { url: data.url || "/floor" },
-      };
-      // Browsers reject a notification that is both silent and vibrating,
-      // so only one of the two is ever set.
-      if (played) options.silent = true;
-      else options.vibrate = VIBRATE;
-
-      try {
-        await self.registration.showNotification(title, options);
-      } catch (error) {
-        // Never lose the popup over an unsupported option: retry with the basics.
-        console.error("showNotification failed, retrying plain", error);
-        await self.registration.showNotification(title, { body: options.body, icon: options.icon, data: options.data });
-      }
-    })(),
-  );
+  event.waitUntil(showArrival(data));
 });
+
+async function showArrival(data) {
+  const title = data.title || "Arrival Desk";
+  const options = {
+    body: data.body || "",
+    icon: "/icon-192.png",
+    badge: "/badge-96.png", // small white glyph for the Android status bar
+    tag: data.tag,
+    renotify: Boolean(data.tag),
+    requireInteraction: !IS_MOBILE,
+    timestamp: Date.now(),
+    data: { url: data.url || "/floor", v: VERSION },
+  };
+
+  let playedChime = false;
+  if (!IS_MOBILE) {
+    // Only a tab the person can actually see may replace the system sound.
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const visible = windows.filter((c) => c.url.startsWith(self.location.origin) && c.visibilityState === "visible");
+    playedChime = await askTabsToPlay(visible);
+  }
+
+  // Browsers reject a notification that is both silent and vibrating.
+  if (playedChime) options.silent = true;
+  else options.vibrate = VIBRATE;
+
+  try {
+    await self.registration.showNotification(title, options);
+  } catch (error) {
+    // Never lose the alert over an unsupported option: retry with the basics.
+    console.error("showNotification failed, retrying plain", error);
+    await self.registration.showNotification(title, { body: options.body, icon: options.icon, data: options.data });
+  }
+}
 
 function askTabsToPlay(clients) {
   if (clients.length === 0) return Promise.resolve(false);
@@ -62,8 +69,7 @@ function askTabsToPlay(clients) {
         resolve(value);
       }
     };
-    // Don't hold the notification back for long.
-    setTimeout(() => finish(false), 700);
+    setTimeout(() => finish(false), 500);
     for (const client of clients) {
       const channel = new MessageChannel();
       channel.port1.onmessage = (event) => {
