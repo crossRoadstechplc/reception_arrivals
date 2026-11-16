@@ -75,8 +75,7 @@ export function GuestManager({
   const counts = useMemo(
     () => ({
       expected: guests.filter((g) => g.status === "EXPECTED").length,
-      lobby: guests.filter((g) => g.status === "ARRIVED").length,
-      cleared: guests.filter((g) => g.status === "CLEARED").length,
+      checkedIn: guests.filter((g) => g.status === "ARRIVED" || g.status === "CLEARED").length,
       gone: guests.filter((g) => g.status === "CANCELLED" || g.status === "NO_SHOW").length,
     }),
     [guests],
@@ -174,10 +173,9 @@ export function GuestManager({
           <PushPrompt />
 
           {/* Day summary + main action */}
-          <section className="grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(4,1fr)_auto]">
+          <section className="grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(3,1fr)_auto]">
             <StatTile label="Expected" value={counts.expected} tone="expected" />
-            <StatTile label="In lobby" value={counts.lobby} tone="arrived" />
-            <StatTile label="Cleared" value={counts.cleared} tone="cleared" />
+            <StatTile label="Checked in" value={counts.checkedIn} tone="cleared" />
             <StatTile label="Cancelled / no-show" value={counts.gone} tone="idle" />
             <button
               type="button"
@@ -223,7 +221,7 @@ export function GuestManager({
                   <li
                     key={guest.id}
                     className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center ${inactive ? "bg-panel-2/60" : ""} ${
-                      guest.status === "ARRIVED" ? "bg-arrived-soft/40" : ""
+                      guest.status === "ARRIVED" || guest.status === "CLEARED" ? "bg-cleared-soft/40" : ""
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -244,14 +242,9 @@ export function GuestManager({
                               Host: <span className="font-medium text-ink-soft">{mine ? "You" : guest.hostName}</span>
                             </>
                           ) : null}
-                          {guest.status === "ARRIVED" && guest.arrivedAt ? (
-                            <span className="font-semibold text-arrived">
-                              {isAdmin ? " · " : ""}In the lobby since {formatClock(guest.arrivedAt, timeZone)}
-                            </span>
-                          ) : null}
-                          {guest.status === "CLEARED" && guest.clearedAt ? (
-                            <span>
-                              {isAdmin ? " · " : ""}Went up at {formatClock(guest.clearedAt, timeZone)}
+                          {(guest.status === "ARRIVED" || guest.status === "CLEARED") && (guest.arrivedAt ?? guest.clearedAt) ? (
+                            <span className="font-semibold text-cleared">
+                              {isAdmin ? " · " : ""}Checked in at {formatClock((guest.arrivedAt ?? guest.clearedAt)!, timeZone)}
                             </span>
                           ) : null}
                         </p>
@@ -420,7 +413,7 @@ function GuestForm({
       description={
         addedCount > 0
           ? `${addedCount} added so far. Host and company are kept for the next one.`
-          : `${floorName} · reception will see this on the lobby board.`
+          : `${floorName} · reception will see this at the front desk.`
       }
       onClose={onClose}
       footer={

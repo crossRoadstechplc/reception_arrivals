@@ -338,6 +338,21 @@ input[type="radio"] {
   }
 }
 
+@keyframes slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.slide-in {
+  animation: slide-in 200ms ease;
+}
+
 .rise {
   animation: rise 220ms ease;
 }
@@ -360,7 +375,8 @@ input[type="radio"] {
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .fade,
-  .flash {
+  .flash,
+  .slide-in {
     animation: none;
   }
 }

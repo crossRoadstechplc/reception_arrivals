@@ -176,3 +176,15 @@ export async function deleteGuest(guestId: string): Promise<ActionResult> {
   await refreshBoards();
   return { ok: true };
 }
+
+/** Saves reception's private note on a visit. Floor staff never see it. */
+export async function setDeskNote(guestId: string, note: string): Promise<ActionResult> {
+  await requireRoles(["RECEPTION", "SUPER_ADMIN"]);
+  const trimmed = note.trim();
+  if (trimmed.length > 500) return { ok: false, error: "Keep the note under 500 characters." };
+  const guest = await db.guest.findUnique({ where: { id: guestId }, select: { id: true } });
+  if (!guest) return { ok: false, error: "Guest not found." };
+  await db.guest.update({ where: { id: guest.id }, data: { deskNote: trimmed || null } });
+  revalidatePath("/reception");
+  return { ok: true };
+}

@@ -6,7 +6,7 @@ import { isISODate, officeTimeZone, officeTodayISO, toDateOnly } from "@/lib/dat
 import { requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
 
-export const metadata: Metadata = { title: "Board" };
+export const metadata: Metadata = { title: "Reception" };
 
 export default async function ReceptionPage({
   searchParams,
@@ -22,7 +22,12 @@ export default async function ReceptionPage({
     db.floor.findMany({ where: { active: true }, orderBy: { number: "asc" } }),
     db.guest.findMany({
       where: { visitDate: toDateOnly(date), floor: { active: true } },
-      include: { floor: true, hostUser: { select: { name: true, email: true } } },
+      include: {
+        floor: true,
+        hostUser: { select: { name: true, email: true } },
+        createdBy: { select: { name: true, email: true } },
+        arrivedBy: { select: { name: true, email: true } },
+      },
       orderBy: [{ floor: { number: "asc" } }, { guestName: "asc" }],
     }),
   ]);
@@ -54,6 +59,11 @@ export default async function ReceptionPage({
           floorId: guest.floorId,
           floorName: guest.floor.name,
           floorNumber: guest.floor.number,
+          deskNote: guest.deskNote,
+          createdAt: guest.createdAt.toISOString(),
+          createdByName: guest.createdBy?.name || guest.createdBy?.email || null,
+          arrivedByName: guest.arrivedBy?.name || guest.arrivedBy?.email || null,
+          hostNotifiedAt: guest.hostNotifiedAt ? guest.hostNotifiedAt.toISOString() : null,
         }))}
       />
     </main>

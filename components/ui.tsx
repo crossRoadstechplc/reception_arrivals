@@ -9,7 +9,7 @@ import { AlertIcon, CheckIcon, ChevronLeft, ChevronRight, XIcon } from "@/compon
 
 const STATUS_TONE: Record<GuestStatus, string> = {
   EXPECTED: "bg-expected-soft text-expected",
-  ARRIVED: "bg-arrived-soft text-arrived",
+  ARRIVED: "bg-cleared-soft text-cleared",
   CLEARED: "bg-cleared-soft text-cleared",
   CANCELLED: "bg-idle-soft text-idle",
   NO_SHOW: "bg-danger-soft text-danger",
@@ -17,7 +17,7 @@ const STATUS_TONE: Record<GuestStatus, string> = {
 
 const STATUS_DOT: Record<GuestStatus, string> = {
   EXPECTED: "bg-expected",
-  ARRIVED: "bg-arrived",
+  ARRIVED: "bg-cleared",
   CLEARED: "bg-cleared",
   CANCELLED: "bg-idle",
   NO_SHOW: "bg-danger",
@@ -147,6 +147,62 @@ export function Modal({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Side panel ---------- */
+
+/** Panel that slides in from the right (full width on phones). */
+export function Drawer({
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  title: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  const titleId = useId();
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeRef.current();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div
+      className="fade fixed inset-0 z-40 flex justify-end bg-ink/30"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="slide-in flex h-full w-full max-w-md flex-col bg-panel shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+          <div id={titleId} className="min-w-0 flex-1">
+            {title}
+          </div>
+          <button type="button" className="btn btn-ghost btn-icon btn-sm -mr-2" onClick={onClose} aria-label="Close">
+            <XIcon className="size-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto px-5 py-4">{children}</div>
+        {footer ? <div className="flex flex-wrap gap-2 border-t border-line bg-panel-2 px-5 py-3">{footer}</div> : null}
+      </aside>
     </div>
   );
 }

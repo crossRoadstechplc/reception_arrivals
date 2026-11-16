@@ -61,8 +61,9 @@ export function personKind(role: Role, floorRoles: FloorRole[]): PersonKind {
 
 export const STATUS_LABEL: Record<GuestStatus, string> = {
   EXPECTED: "Expected",
-  ARRIVED: "In lobby",
-  CLEARED: "Cleared",
+  // "Arrived" is from the old two-step flow; both now read as checked in.
+  ARRIVED: "Checked in",
+  CLEARED: "Checked in",
   CANCELLED: "Cancelled",
   NO_SHOW: "No-show",
 };

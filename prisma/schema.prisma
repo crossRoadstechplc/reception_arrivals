@@ -166,6 +166,8 @@ model Guest {
   hostNotifiedAt  DateTime?   @map("host_notified_at")
   /// "push", "email", "push+email", or "none".
   hostNotifiedVia String?     @map("host_notified_via")
+  /// Private note from reception. Only reception and super admins see it.
+  deskNote        String?     @map("desk_note")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
