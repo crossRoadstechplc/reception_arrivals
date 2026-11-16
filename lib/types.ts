@@ -70,3 +70,8 @@ export const STATUS_LABEL: Record<GuestStatus, string> = {
 
 /** Sentinel value for "host has no account, type their name". */
 export const OTHER_HOST = "__other__";
+
+/** "6th floor · Acme PLC": each floor is one company, so show both together. */
+export function floorLabel(floor: { name: string; company?: string | null }) {
+  return floor.company ? `${floor.name} · ${floor.company}` : floor.name;
+}

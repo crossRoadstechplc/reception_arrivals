@@ -17,10 +17,11 @@ import {
   StatusBadge,
   Toast,
   useToast,
+  PlateTag,
 } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
 import { PushPrompt } from "@/components/push-prompt";
-import { BuildingIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
+import { BuildingIcon, CarIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
 export type FloorGuest = {
   id: string;
@@ -31,6 +32,8 @@ export type FloorGuest = {
   expectedArrival: string | null;
   status: GuestStatus;
   notes: string | null;
+  licensePlate: string | null;
+  vehicle: string | null;
   expectedLabel: string | null;
   checkedInLabel: string | null;
 };
@@ -248,6 +251,13 @@ export function GuestManager({
                             </span>
                           ) : null}
                         </p>
+                        {guest.licensePlate || guest.vehicle ? (
+                          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                            <CarIcon className="size-4 shrink-0" />
+                            {guest.licensePlate ? <PlateTag plate={guest.licensePlate} /> : null}
+                            {guest.vehicle ? <span>{guest.vehicle}</span> : null}
+                          </p>
+                        ) : null}
                         {guest.notes ? (
                           <p className="mt-1.5 inline-flex max-w-full items-start gap-1.5 text-xs text-muted">
                             <NoteIcon className="mt-px size-3.5 shrink-0" />
@@ -364,6 +374,7 @@ function GuestForm({
   const [addedCount, setAddedCount] = useState(0);
   const [pending, startTransition] = useTransition();
   const keepOpen = useRef(false);
+  const [byCar, setByCar] = useState(Boolean(guest?.licensePlate || guest?.vehicle));
   const [hostChoice, setHostChoice] = useState<string>(
     guest ? (guest.hostUserId ?? OTHER_HOST) : currentUserId,
   );
@@ -384,6 +395,8 @@ function GuestForm({
         hostName: String(formData.get("hostName") ?? ""),
         expectedArrival: String(formData.get("expectedArrival") ?? ""),
         notes: String(formData.get("notes") ?? ""),
+        licensePlate: byCar ? String(formData.get("licensePlate") ?? "") : "",
+        vehicle: byCar ? String(formData.get("vehicle") ?? "") : "",
       });
       if (!result.ok) {
         setError(result.error);
@@ -398,6 +411,7 @@ function GuestForm({
           (form.elements.namedItem("guestName") as HTMLInputElement).value = "";
           (form.elements.namedItem("notes") as HTMLTextAreaElement).value = "";
         }
+        setByCar(false);
         setAddedCount((count) => count + 1);
         nameRef.current?.focus();
         return;
@@ -508,6 +522,51 @@ function GuestForm({
             <TimeField key={addedCount} name="expectedArrival" defaultValue={guest?.expectedArrival} />
           </label>
         </div>
+        <div className="rounded-xl border border-line">
+          <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--ink)]"
+              checked={byCar}
+              onChange={(event) => setByCar(event.target.checked)}
+            />
+            <CarIcon className="size-5 text-muted" />
+            <span className="flex-1">
+              <span className="block text-sm font-semibold">Coming by car</span>
+              <span className="block text-xs text-muted">Reception will arrange parking for them.</span>
+            </span>
+          </label>
+          {byCar ? (
+            <div className="grid gap-3 border-t border-line p-3 sm:grid-cols-[11rem_1fr]">
+              <label>
+                <span className="label">
+                  License plate <span className="font-normal text-muted">(optional)</span>
+                </span>
+                <input
+                  className="field font-mono uppercase"
+                  name="licensePlate"
+                  defaultValue={guest?.licensePlate ?? ""}
+                  placeholder="e.g. AA 3-B12345"
+                  maxLength={20}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                <span className="label">
+                  Car <span className="font-normal text-muted">(optional)</span>
+                </span>
+                <input
+                  className="field"
+                  name="vehicle"
+                  defaultValue={guest?.vehicle ?? ""}
+                  placeholder="e.g. White Toyota Corolla"
+                  maxLength={80}
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
         <label>
           <span className="label">
             Notes for reception <span className="font-normal text-muted">(optional)</span>
@@ -516,7 +575,7 @@ function GuestForm({
             className="field"
             name="notes"
             defaultValue={guest?.notes ?? ""}
-            placeholder="e.g. Needs a parking pass, bring to meeting room 3"
+            placeholder="e.g. Bring to meeting room 3"
             maxLength={500}
           />
         </label>
@@ -525,3 +584,4 @@ function GuestForm({
     </Modal>
   );
 }
+

@@ -119,6 +119,8 @@ model VerificationToken {
 model Floor {
   id        String   @id @default(cuid())
   name      String
+  /// The company (tenant) that occupies this floor.
+  company   String?
   number    Int      @unique
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
@@ -168,6 +170,10 @@ model Guest {
   hostNotifiedVia String?     @map("host_notified_via")
   /// Private note from reception. Only reception and super admins see it.
   deskNote        String?     @map("desk_note")
+  /// Optional: the guest is coming by car, so reception can arrange parking.
+  licensePlate    String?     @map("license_plate")
+  /// e.g. "White Toyota Corolla".
+  vehicle         String?
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

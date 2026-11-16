@@ -436,3 +436,16 @@ export function initials(name: string | null | undefined, fallback = "?") {
   const parts = source.split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
+
+/** A license plate, styled like a plate so it's easy to spot. */
+export function PlateTag({ plate, large = false }: { plate: string; large?: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-md border border-ink/70 bg-white font-mono font-semibold tracking-wider text-ink ${
+        large ? "px-2.5 py-1 text-base" : "px-1.5 py-px text-xs"
+      }`}
+    >
+      {plate}
+    </span>
+  );
+}

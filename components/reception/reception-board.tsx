@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { setDeskNote, setReceptionStatus } from "@/lib/actions/guests";
 import { timeOfDayMinutes } from "@/lib/dates";
 import { type GuestStatus } from "@/lib/types";
-import { Alert, DateHeading, DateNav, Drawer, EmptyState, StatusBadge, Toast, useToast } from "@/components/ui";
+import { Alert, DateHeading, DateNav, Drawer, EmptyState, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
-import { CheckIcon, NoteIcon, PencilIcon, SearchIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
+import { CarIcon, CheckIcon, NoteIcon, PencilIcon, SearchIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
 export type BoardGuest = {
   id: string;
@@ -31,10 +31,17 @@ export type BoardGuest = {
   createdByName: string | null;
   floorId: string;
   floorName: string;
+  /** The company that occupies the guest's floor. */
+  floorCompany: string | null;
   floorNumber: number;
+  licensePlate: string | null;
+  vehicle: string | null;
 };
 
-type FloorOption = { id: string; name: string; number: number };
+type FloorOption = { id: string; name: string; company: string | null; number: number };
+
+const hasCar = (guest: BoardGuest) => Boolean(guest.licensePlate || guest.vehicle);
+const squash = (text: string) => text.toLowerCase().replace(/[\s-]+/g, "");
 type Tab = "expected" | "in" | "gone";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -77,6 +84,7 @@ export function ReceptionBoard({
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("expected");
   const [floorId, setFloorId] = useState("all");
+  const [carsOnly, setCarsOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -116,10 +124,14 @@ export function ReceptionBoard({
     () =>
       guests.filter((guest) => {
         if (floorId !== "all" && guest.floorId !== floorId) return false;
+        if (carsOnly && !hasCar(guest)) return false;
         if (!needle) return true;
-        return `${guest.guestName} ${guest.company ?? ""} ${guest.hostName}`.toLowerCase().includes(needle);
+        const text = `${guest.guestName} ${guest.company ?? ""} ${guest.hostName} ${guest.floorCompany ?? ""} ${guest.vehicle ?? ""}`;
+        // Plates match with or without spaces and dashes.
+        if (text.toLowerCase().includes(needle)) return true;
+        return guest.licensePlate ? squash(guest.licensePlate).includes(squash(needle)) : false;
       }),
-    [guests, floorId, needle],
+    [guests, floorId, carsOnly, needle],
   );
 
   const counts = useMemo(() => {
@@ -143,6 +155,12 @@ export function ReceptionBoard({
     for (const guest of guests) if (tabOf(guest.status) === "expected") map[guest.floorId] = (map[guest.floorId] ?? 0) + 1;
     return map;
   }, [guests]);
+
+  // Cars still to come or parked (not cancelled), so reception can plan parking.
+  const carCount = useMemo(
+    () => guests.filter((g) => hasCar(g) && tabOf(g.status) !== "gone" && (floorId === "all" || g.floorId === floorId)).length,
+    [guests, floorId],
+  );
 
   const selected = guests.find((guest) => guest.id === selectedId) ?? null;
   const isToday = date === today;
@@ -219,7 +237,7 @@ export function ReceptionBoard({
               if (event.key === "Escape") setQuery("");
               if (event.key === "Enter" && visible.length === 1) setSelectedId(visible[0].id);
             }}
-            placeholder="Find a visitor, company or host…"
+            placeholder="Find a visitor, company, host or plate…"
             className="field h-12 pl-11 text-base"
             autoComplete="off"
           />
@@ -228,12 +246,13 @@ export function ReceptionBoard({
           aria-label="Floor"
           value={floorId}
           onChange={(event) => setFloorId(event.target.value)}
-          className="field h-12 font-medium sm:w-56"
+          className="field h-12 font-medium sm:w-72"
         >
           <option value="all">All floors</option>
           {floors.map((floor) => (
             <option key={floor.id} value={floor.id}>
               {floor.name}
+              {floor.company ? ` · ${floor.company}` : ""}
               {floorCounts[floor.id] ? ` · ${floorCounts[floor.id]} expected` : ""}
             </option>
           ))}
@@ -271,8 +290,23 @@ export function ReceptionBoard({
             );
           })}
         </div>
+        <button
+          type="button"
+          aria-pressed={carsOnly}
+          onClick={() => setCarsOnly((v) => !v)}
+          title="Show only visitors coming by car"
+          className={`mb-1.5 ml-auto inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+            carsOnly ? "border-ink bg-ink text-white" : "border-line-strong text-muted hover:text-ink"
+          }`}
+        >
+          <CarIcon className="size-4" />
+          By car
+          <span className={`rounded-full px-1.5 font-mono text-[11px] ${carsOnly ? "bg-white/20" : "bg-idle-soft"}`}>
+            {carCount}
+          </span>
+        </button>
         {searching ? (
-          <p className="ml-auto pb-2 text-sm text-muted">
+          <p className="w-full pb-2 text-sm text-muted sm:w-auto">
             {visible.length} {visible.length === 1 ? "match" : "matches"} for “{query.trim()}”
             <button type="button" className="ml-2 font-semibold text-ink hover:underline" onClick={() => setQuery("")}>
               Clear
@@ -290,7 +324,9 @@ export function ReceptionBoard({
           title={
             searching
               ? "No visitor matches that"
-              : guests.length === 0
+              : carsOnly
+                ? "No visitors coming by car here"
+                : guests.length === 0
                 ? "No visitors listed for this day"
                 : tab === "expected"
                   ? "Everyone expected is checked in"
@@ -300,7 +336,9 @@ export function ReceptionBoard({
           }
           body={
             searching
-              ? "Check the spelling, or try the company or host name."
+              ? "Check the spelling, or try the company, host or plate."
+              : carsOnly
+                ? "Turn off “By car” to see everyone."
               : guests.length === 0
                 ? "Floor staff add their visitors ahead of time. New names appear here automatically."
                 : undefined
@@ -415,9 +453,11 @@ function VisitorRow({
             ) : null}
           </div>
           {guest.company ? <p className="truncate text-sm text-muted">{guest.company}</p> : null}
+          {hasCar(guest) ? <CarLine guest={guest} /> : null}
           {/* Host + floor inline on small screens */}
           <p className="truncate text-sm text-muted lg:hidden">
             Visiting <span className="font-medium text-ink-soft">{guest.hostName}</span> · {guest.floorName}
+            {guest.floorCompany ? ` · ${guest.floorCompany}` : ""}
           </p>
         </div>
 
@@ -433,7 +473,10 @@ function VisitorRow({
             <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-ink font-mono text-[11px] text-white">
               {guest.floorNumber}
             </span>
-            <span className="truncate">{guest.floorName}</span>
+            <span className="min-w-0">
+              <span className="block truncate">{guest.floorName}</span>
+              {guest.floorCompany ? <span className="block truncate text-xs text-muted">{guest.floorCompany}</span> : null}
+            </span>
           </span>
         </div>
 
@@ -459,6 +502,17 @@ function VisitorRow({
         </div>
       </div>
     </li>
+  );
+}
+
+function CarLine({ guest }: { guest: BoardGuest }) {
+  return (
+    <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted">
+      <CarIcon className="size-4 shrink-0 text-ink-soft" />
+      {guest.licensePlate ? <PlateTag plate={guest.licensePlate} /> : null}
+      {guest.vehicle ? <span className="truncate">{guest.vehicle}</span> : null}
+      <span className="truncate">· park for {guest.floorCompany ?? guest.floorName}</span>
+    </p>
   );
 }
 
@@ -578,7 +632,10 @@ function VisitorPanel({
           </div>
           <div>
             <dt className="text-xs font-semibold text-muted">Floor</dt>
-            <dd className="mt-0.5 font-medium">{guest.floorName}</dd>
+            <dd className="mt-0.5 font-medium">
+              {guest.floorName}
+              {guest.floorCompany ? <span className="block text-sm font-normal text-muted">{guest.floorCompany}</span> : null}
+            </dd>
           </div>
           <div className="col-span-2">
             <dt className="text-xs font-semibold text-muted">Visiting</dt>
@@ -588,6 +645,23 @@ function VisitorPanel({
             </dd>
           </div>
         </dl>
+
+        {hasCar(guest) ? (
+          <div className="rounded-xl border border-line bg-panel-2 px-3.5 py-3 text-sm">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide text-muted uppercase">
+              <CarIcon className="size-4" />
+              Coming by car
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {guest.licensePlate ? <PlateTag plate={guest.licensePlate} large /> : <span className="text-muted">No plate given</span>}
+              {guest.vehicle ? <span className="font-medium">{guest.vehicle}</span> : null}
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Parking for <span className="font-semibold text-ink-soft">{guest.floorCompany ?? guest.floorName}</span>
+              {guest.floorCompany ? ` (${guest.floorName})` : ""}
+            </p>
+          </div>
+        ) : null}
 
         {guest.notes ? (
           <div className="rounded-xl bg-expected-soft px-3.5 py-2.5 text-sm text-expected">

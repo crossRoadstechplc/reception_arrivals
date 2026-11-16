@@ -30,6 +30,7 @@ export default async function AdminPage() {
         floors={floors.map((floor) => ({
           id: floor.id,
           name: floor.name,
+          company: floor.company,
           number: floor.number,
           active: floor.active,
           guestCount: floor._count.guests,

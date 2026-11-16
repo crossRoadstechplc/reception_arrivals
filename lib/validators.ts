@@ -14,10 +14,13 @@ export const guestInputSchema = z.object({
   hostName: z.string().trim().max(120).optional().or(z.literal("")),
   expectedArrival: time.optional().or(z.literal("")),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
+  licensePlate: z.string().trim().max(20, "That plate number is too long").optional().or(z.literal("")),
+  vehicle: z.string().trim().max(80).optional().or(z.literal("")),
 });
 
 export const floorInputSchema = z.object({
   name: z.string().trim().min(2, "Enter a floor name").max(80),
+  company: z.string().trim().max(120).optional().or(z.literal("")),
   number: z.coerce.number().int().min(0).max(200),
   active: z.boolean().optional(),
 });

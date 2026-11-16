@@ -51,6 +51,7 @@ export default async function ReceptionPage({
         floors={floors.map((floor) => ({
           id: floor.id,
           name: floor.name,
+          company: floor.company,
           number: floor.number,
         }))}
         guests={guests.map((guest) => ({
@@ -71,6 +72,9 @@ export default async function ReceptionPage({
           notes: guest.notes,
           floorId: guest.floorId,
           floorName: guest.floor.name,
+          floorCompany: guest.floor.company,
+          licensePlate: guest.licensePlate,
+          vehicle: guest.vehicle,
           floorNumber: guest.floor.number,
           deskNote: guest.deskNote,
           createdByName: guest.createdBy?.name || guest.createdBy?.email || null,

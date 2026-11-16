@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { formatClock, formatOfficeDate, formatTimeOfDay, isISODate, officeTodayISO, toDateOnly } from "@/lib/dates";
 import { floorRoleOf, requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
-import type { FloorRole } from "@/lib/types";
+import { floorLabel, type FloorRole } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Guests" };
 
@@ -24,7 +24,7 @@ export default async function FloorPage({
     user.role === "SUPER_ADMIN"
       ? (await db.floor.findMany({ where: { active: true }, orderBy: { number: "asc" } })).map((floor) => ({
           id: floor.id,
-          name: floor.name,
+          name: floorLabel(floor),
           number: floor.number,
           role: "ADMIN" as const,
         }))
@@ -33,7 +33,7 @@ export default async function FloorPage({
           .sort((a, b) => a.floor.number - b.floor.number)
           .map((assignment) => ({
             id: assignment.floor.id,
-            name: assignment.floor.name,
+            name: floorLabel(assignment.floor),
             number: assignment.floor.number,
             role: assignment.role,
           }));
@@ -97,6 +97,8 @@ export default async function FloorPage({
           expectedArrival: guest.expectedArrival,
           status: guest.status,
           notes: guest.notes,
+          licensePlate: guest.licensePlate,
+          vehicle: guest.vehicle,
           // Time text is made on the server so every device shows the same thing.
           expectedLabel: formatTimeOfDay(guest.expectedArrival),
           checkedInLabel: guest.arrivedAt ?? guest.clearedAt ? formatClock((guest.arrivedAt ?? guest.clearedAt)!) : null,

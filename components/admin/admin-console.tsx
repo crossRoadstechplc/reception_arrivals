@@ -23,6 +23,7 @@ import { BuildingIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, UserIcon } f
 type FloorRow = {
   id: string;
   name: string;
+  company: string | null;
   number: number;
   active: boolean;
   guestCount: number;
@@ -553,6 +554,7 @@ function PersonModal({
                       <span className="w-7 font-mono text-xs text-muted">{floor.number}</span>
                       <span className={`min-w-0 flex-1 truncate text-sm font-medium ${floor.active ? "" : "text-muted"}`}>
                         {floor.name}
+                        {floor.company ? <span className="font-normal text-muted"> · {floor.company}</span> : null}
                         {!floor.active ? " (off)" : ""}
                       </span>
                       <div className="flex rounded-lg border border-line-strong p-0.5" role="radiogroup" aria-label={`Role on ${floor.name}`}>
@@ -707,6 +709,11 @@ function FloorsTab({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`truncate font-semibold ${floor.active ? "" : "text-muted"}`}>{floor.name}</span>
+              {floor.company ? (
+                <span className="badge max-w-48 truncate bg-admin-soft text-admin">{floor.company}</span>
+              ) : (
+                <span className="badge bg-expected-soft text-expected">No company</span>
+              )}
               {floor.active ? (
                 <span className="badge bg-cleared-soft text-cleared">Active</span>
               ) : (
@@ -756,6 +763,7 @@ function FloorModal({
       const result = await saveFloor({
         id: floor?.id,
         name,
+        company: String(formData.get("company") ?? ""),
         number: Number(formData.get("number")),
         active: isNew ? undefined : active,
       });
@@ -843,9 +851,14 @@ function FloorModal({
           </label>
           <label>
             <span className="label">Name</span>
-            <input className="field" name="name" defaultValue={floor?.name ?? ""} placeholder="e.g. 6th floor – Finance" required minLength={2} />
+            <input className="field" name="name" defaultValue={floor?.name ?? ""} placeholder="e.g. 6th floor" required minLength={2} />
           </label>
         </div>
+        <label>
+          <span className="label">Company on this floor</span>
+          <input className="field" name="company" defaultValue={floor?.company ?? ""} placeholder="e.g. Acme Trading PLC" maxLength={120} />
+          <span className="hint mt-1 block">Shown next to the floor everywhere, and on reception&apos;s parking list.</span>
+        </label>
 
         {!isNew ? (
           <label className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">

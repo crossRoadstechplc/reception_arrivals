@@ -6,6 +6,7 @@ import { TeamManager } from "@/components/floor/team-manager";
 import { db } from "@/lib/db";
 import { requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
+import { floorLabel } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Floor team" };
 
@@ -54,8 +55,8 @@ export default async function FloorTeamPage({
       <AppHeader user={user} items={navItems(user.role, "floor")} />
       <FloorTabs floorId={floor.id} current="team" multiFloor={visibleFloorCount > 1} />
       <TeamManager
-        floor={{ id: floor.id, name: floor.name, number: floor.number }}
-        floors={managed.map((f) => ({ id: f.id, name: f.name, number: f.number }))}
+        floor={{ id: floor.id, name: floorLabel(floor), number: floor.number }}
+        floors={managed.map((f) => ({ id: f.id, name: floorLabel(f), number: f.number }))}
         currentUserId={user.id}
         isSuperAdmin={user.role === "SUPER_ADMIN"}
         members={members
@@ -66,7 +67,7 @@ export default async function FloorTeamPage({
             active: m.user.active,
             pending: !m.user.passwordHash,
             role: m.role,
-            otherFloors: m.user.floorAssignments.filter((a) => a.floorId !== floor.id).map((a) => a.floor.name),
+            otherFloors: m.user.floorAssignments.filter((a) => a.floorId !== floor.id).map((a) => floorLabel(a.floor)),
           }))
           .sort((a, b) => (a.role === b.role ? (a.name ?? "").localeCompare(b.name ?? "") : a.role === "ADMIN" ? -1 : 1))}
       />

@@ -143,6 +143,15 @@ export const TrashIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const CarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 17H3.5a.5.5 0 0 1-.5-.5V13l2-5.2A1.5 1.5 0 0 1 6.4 7h11.2a1.5 1.5 0 0 1 1.4.8L21 13v3.5a.5.5 0 0 1-.5.5H19" />
+    <path d="M3 13h18M9 17h6" />
+    <circle cx="7" cy="17" r="2" />
+    <circle cx="17" cy="17" r="2" />
+  </Svg>
+);
+
 export const AlertIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />

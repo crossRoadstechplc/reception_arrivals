@@ -31,6 +31,8 @@ export async function saveGuest(input: {
   hostName?: string;
   expectedArrival?: string;
   notes?: string;
+  licensePlate?: string;
+  vehicle?: string;
 }): Promise<ActionResult> {
   const user = await requireUser();
   if (user.role !== "FLOOR_STAFF" && user.role !== "SUPER_ADMIN") {
@@ -85,6 +87,9 @@ export async function saveGuest(input: {
     hostName,
     expectedArrival: blankToNull(parsed.data.expectedArrival),
     notes: blankToNull(parsed.data.notes),
+    // Plates are stored in capitals so they read the same on every screen.
+    licensePlate: blankToNull(parsed.data.licensePlate?.toUpperCase().replace(/\s+/g, " ")),
+    vehicle: blankToNull(parsed.data.vehicle),
   };
 
   if (input.id) {

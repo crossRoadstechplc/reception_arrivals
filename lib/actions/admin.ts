@@ -8,6 +8,7 @@ import { requireRoles } from "@/lib/permissions";
 import type { ActionResult, FloorRole, Role } from "@/lib/types";
 import { sendInvite } from "@/lib/invites";
 import {
+  blankToNull,
   firstIssue,
   floorInputSchema,
   inviteSchema,
@@ -24,6 +25,7 @@ function refreshAdmin() {
 export async function saveFloor(input: {
   id?: string;
   name: string;
+  company?: string;
   number: number;
   active?: boolean;
 }): Promise<ActionResult> {
@@ -37,6 +39,7 @@ export async function saveFloor(input: {
         where: { id: input.id },
         data: {
           name: parsed.data.name,
+          company: blankToNull(parsed.data.company),
           number: parsed.data.number,
           active: parsed.data.active ?? true,
         },
@@ -45,6 +48,7 @@ export async function saveFloor(input: {
       await db.floor.create({
         data: {
           name: parsed.data.name,
+          company: blankToNull(parsed.data.company),
           number: parsed.data.number,
           active: true,
         },
