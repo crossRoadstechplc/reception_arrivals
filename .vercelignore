@@ -1,2 +1,3 @@
 # The Flutter app is built separately; the website deploy does not need it.
-mobile/
+# Leading slash: only the top-level folder, not app/api/mobile.
+/mobile/
