@@ -159,6 +159,28 @@ export const CarIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const DownloadIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4v11M7 10.5 12 15.5l5-5" />
+    <path d="M5 19.5h14" />
+  </Svg>
+);
+
+export const PhoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+    <path d="M10.5 18.5h3" />
+  </Svg>
+);
+
+/** The iPhone "Share" button: a box with an arrow pointing up. */
+export const ShareIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3.5v11M8 7.5l4-4 4 4" />
+    <path d="M8.5 10.5H6.5a1.5 1.5 0 0 0-1.5 1.5v7a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5h-2" />
+  </Svg>
+);
+
 export const AlertIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />

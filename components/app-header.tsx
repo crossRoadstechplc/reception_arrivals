@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signOut } from "@/lib/auth";
 import { PERSON_KIND_LABEL, personKind, type FloorRole, type Role } from "@/lib/types";
 import { ArrivalChime } from "@/components/arrival-chime";
+import { GetAppButton } from "@/components/get-app-button";
 import { BoardIcon, ListIcon, LogoMark, LogoutIcon, SettingsIcon } from "@/components/icons";
 
 const NAV_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -59,6 +60,7 @@ export function AppHeader({
         )}
 
         <div className="flex shrink-0 items-center gap-2">
+          <GetAppButton offerAndroidApp={user.role !== "RECEPTION"} />
           <div className="hidden text-right leading-tight md:block">
             <div className="max-w-44 truncate text-sm font-semibold text-white">{user.name || user.email}</div>
             <div className="text-xs text-console-muted">{roleLabel}</div>

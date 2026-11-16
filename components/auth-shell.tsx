@@ -1,4 +1,5 @@
 import { LogoMark } from "@/components/icons";
+import { GetAppButton } from "@/components/get-app-button";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,9 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             <LogoMark className="size-10" />
           </div>
           {children}
+          <div className="mt-10 flex justify-center">
+            <GetAppButton variant="link" />
+          </div>
         </div>
       </section>
     </main>
