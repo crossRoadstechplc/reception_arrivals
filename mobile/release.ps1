@@ -99,7 +99,8 @@ git push origin $tag
 if ($LASTEXITCODE -ne 0) { Fail ("Pushing the tag failed. Fix it, then run: git push origin $tag; gh release create $tag $out") }
 
 $notesFile = New-TemporaryFile
-Set-Content -Path $notesFile -Value $body -Encoding utf8
+# UTF-8 without a BOM (Windows PowerShell's -Encoding utf8 adds one, which ends up in the notes).
+[IO.File]::WriteAllText($notesFile, $body, (New-Object System.Text.UTF8Encoding $false))
 gh release create $tag $out --title "Arrival Desk $version" --notes-file $notesFile
 $ok = $LASTEXITCODE -eq 0
 Remove-Item $notesFile
