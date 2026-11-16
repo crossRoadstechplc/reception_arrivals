@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The Flutter app (and its large build output) is not part of the website. */
+@source not "../mobile";
 
 :root {
   /* Brand */

@@ -12,16 +12,17 @@ const userInclude = {
 
 export type AppUser = Prisma.UserGetPayload<{ include: typeof userInclude }>;
 
+/** An active user with their floors, or null. */
+export async function loadAppUser(id: string): Promise<AppUser | null> {
+  const user = await db.user.findUnique({ where: { id }, include: userInclude });
+  return user?.active ? user : null;
+}
+
 export const getCurrentUser = cache(async (): Promise<AppUser | null> => {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;
-  const user = await db.user.findUnique({
-    where: { id },
-    include: userInclude,
-  });
-  if (!user?.active) return null;
-  return user;
+  return loadAppUser(id);
 });
 
 export async function requireUser() {

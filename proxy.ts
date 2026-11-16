@@ -17,7 +17,9 @@ export function proxy(request: NextRequest) {
     pathname === "/sw.js" ||
     pathname.startsWith("/sounds/") ||
     pathname === "/manifest.webmanifest" ||
-    pathname.startsWith("/api/auth");
+    pathname.startsWith("/api/auth") ||
+    // The Android app signs in with its own bearer token (lib/mobile-auth.ts).
+    pathname.startsWith("/api/mobile/");
   const signedIn = hasSession(request);
 
   if (!signedIn && !isPublic) {

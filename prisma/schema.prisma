@@ -55,6 +55,7 @@ model User {
   guestsArrived        Guest[]              @relation("GuestArrivedBy")
   passwordResetTokens  PasswordResetToken[]
   pushSubscriptions    PushSubscription[]
+  deviceTokens         DeviceToken[]
 
   @@map("users")
 }
@@ -203,4 +204,19 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+/// A phone running the Arrival Desk app, registered for Firebase (FCM) alerts.
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  platform  String   @default("android")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
 }

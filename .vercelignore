@@ -1,0 +1,2 @@
+# The Flutter app is built separately; the website deploy does not need it.
+mobile/
