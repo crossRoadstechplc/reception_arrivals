@@ -153,3 +153,78 @@ void showMessage(BuildContext context, String message, {String? actionLabel, Voi
       ),
     );
 }
+
+/// A white, bordered, rounded block: the "boundary" that groups related content.
+class Panel extends StatelessWidget {
+  const Panel({super.key, required this.child, this.padding = EdgeInsets.zero});
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.panel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        padding: padding,
+        child: child,
+      );
+}
+
+/// Small uppercase title above a panel, with an optional count.
+class SectionHeader extends StatelessWidget {
+  const SectionHeader(this.title, {super.key, this.count, this.color = AppColors.muted, this.trailing});
+  final String title;
+  final int? count;
+  final Color color;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+        child: Row(
+          children: [
+            Text(title.toUpperCase(),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: color)),
+            if (count != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(color: AppColors.idleSoft, borderRadius: BorderRadius.circular(999)),
+                child: Text('$count', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+              ),
+            ],
+            const Spacer(),
+            ?trailing,
+          ],
+        ),
+      );
+}
+
+/// Thin divider between rows inside a [Panel].
+class RowDivider extends StatelessWidget {
+  const RowDivider({super.key, this.indent = 16});
+  final double indent;
+
+  @override
+  Widget build(BuildContext context) => Divider(height: 1, thickness: 1, indent: indent, color: AppColors.line);
+}
+
+/// A small coloured dot marking a guest's state.
+class KindDot extends StatelessWidget {
+  const KindDot(this.kind, {super.key});
+  final GuestKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (kind) {
+      GuestKind.expected => const Color(0xFFD9A441),
+      GuestKind.late => AppColors.signal,
+      GuestKind.arrived => AppColors.cleared,
+      GuestKind.gone => AppColors.lineStrong,
+    };
+    return Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+  }
+}

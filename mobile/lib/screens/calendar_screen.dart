@@ -75,7 +75,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _add() async {
     final today = _loader.today;
-    final saved = await openGuestForm(context, date: _day.compareTo(today) < 0 ? today : _day, hosts: _loader.data?.hosts ?? []);
+    final saved = await openGuestForm(
+      context,
+      date: _day.compareTo(today) < 0 ? today : _day,
+      hosts: _loader.data?.hosts ?? [],
+    );
     if (saved) _loader.load(quiet: true);
   }
 
@@ -91,99 +95,131 @@ class _CalendarScreenState extends State<CalendarScreen> {
           final (from, to) = _range();
           final days = _weekDays();
 
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-                child: Row(
-                  children: [
-                    SegmentedButton<CalendarView>(
-                      showSelectedIcon: false,
-                      style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: AppColors.ink,
-                        selectedForegroundColor: Colors.white,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      segments: const [
-                        ButtonSegment(value: CalendarView.day, label: Text('Day')),
-                        ButtonSegment(value: CalendarView.week, label: Text('Week')),
-                      ],
-                      selected: {_view},
-                      onSelectionChanged: (s) => _focus(_day, view: s.first),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: _view == CalendarView.day ? 'Previous day' : 'Previous week',
-                      onPressed: () => _step(-1),
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                    TextButton(onPressed: _day == today ? null : () => _focus(today), child: const Text('Today')),
-                    IconButton(
-                      tooltip: _view == CalendarView.day ? 'Next day' : 'Next week',
-                      onPressed: () => _step(1),
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _view == CalendarView.day ? friendlyDate(_day, today) : rangeLabel(from, days.last),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              if (_view == CalendarView.week)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: Row(
+          final guests = _loader.on(_day);
+          return RefreshIndicator(
+            onRefresh: () => _loader.load(quiet: true),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+              children: [
+                Panel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final d in days)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: _DayChip(
-                              iso: d,
-                              selected: d == _day,
-                              isToday: d == today,
-                              count: _loader.on(d).length,
-                              onTap: () => _focus(d),
-                              onLongPress: () => _focus(d, view: CalendarView.day),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 4, 4),
+                        child: Row(
+                          children: [
+                            SegmentedButton<CalendarView>(
+                              showSelectedIcon: false,
+                              style: SegmentedButton.styleFrom(
+                                selectedBackgroundColor: AppColors.ink,
+                                selectedForegroundColor: Colors.white,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              segments: const [
+                                ButtonSegment(value: CalendarView.day, label: Text('Day')),
+                                ButtonSegment(value: CalendarView.week, label: Text('Week')),
+                              ],
+                              selected: {_view},
+                              onSelectionChanged: (s) => _focus(_day, view: s.first),
                             ),
+                            const Spacer(),
+                            IconButton(
+                              tooltip: _view == CalendarView.day ? 'Previous day' : 'Previous week',
+                              onPressed: () => _step(-1),
+                              icon: const Icon(Icons.chevron_left),
+                            ),
+                            IconButton(
+                              tooltip: _view == CalendarView.day ? 'Next day' : 'Next week',
+                              onPressed: () => _step(1),
+                              icon: const Icon(Icons.chevron_right),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _view == CalendarView.day ? friendlyDate(_day, today) : rangeLabel(from, days.last),
+                                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
+                              ),
+                            ),
+                            if (_day != today) TextButton(onPressed: () => _focus(today), child: const Text('Today')),
+                            TextButton.icon(
+                              onPressed: () => _showKey(context),
+                              icon: const Icon(Icons.info_outline, size: 18),
+                              label: const Text('Key'),
+                              style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_view == CalendarView.week) ...[
+                        const RowDivider(indent: 0),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+                          child: Row(
+                            children: [
+                              for (final d in days)
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                                    child: _DayChip(
+                                      iso: d,
+                                      selected: d == _day,
+                                      isToday: d == today,
+                                      count: _loader.on(d).length,
+                                      onTap: () => _focus(d),
+                                      onLongPress: () => _focus(d, view: CalendarView.day),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
-              const _Legend(),
-              if (_loader.error != null) ErrorBanner(message: _loader.error!, onRetry: _loader.load),
-              Expanded(
-                child: _loader.data == null && _loader.loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
-                        onRefresh: () => _loader.load(quiet: true),
-                        child: _view == CalendarView.week
-                            ? _Agenda(
-                                guests: _loader.on(_day),
-                                isToday: _day == today,
-                                loader: _loader,
-                                showHost: isAdmin,
-                              )
-                            : _TimeGrid(
-                                guests: _loader.on(_day),
-                                isToday: _day == today,
-                                loader: _loader,
-                                showHost: isAdmin,
-                              ),
-                      ),
-              ),
-            ],
+                if (_loader.error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: ErrorBanner(message: _loader.error!, onRetry: _loader.load),
+                  ),
+                if (_loader.data == null && _loader.loading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 64),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ...[
+                  SectionHeader(_view == CalendarView.week ? longDate(_day) : 'Timeline', count: guests.length),
+                  if (guests.isEmpty)
+                    const Panel(
+                      child: EmptyMessage(icon: Icons.event_available_outlined, title: 'No guests this day'),
+                    )
+                  else if (_view == CalendarView.week)
+                    _Agenda(guests: guests, isToday: _day == today, loader: _loader, showHost: isAdmin)
+                  else
+                    _TimeGrid(guests: guests, isToday: _day == today, loader: _loader, showHost: isAdmin),
+                ],
+              ],
+            ),
           );
         },
       ),
+    );
+  }
+
+  void _showKey(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.panel,
+      builder: (context) => const SafeArea(child: _KeySheet()),
     );
   }
 }
@@ -220,9 +256,19 @@ class _DayChip extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(shortWeekday(iso).toUpperCase(),
-                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: fg.withValues(alpha: 0.75))),
-              Text('${dayOfMonth(iso)}', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: fg)),
+              Text(
+                shortWeekday(iso).toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: fg.withValues(alpha: 0.75),
+                ),
+              ),
+              Text(
+                '${dayOfMonth(iso)}',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: fg),
+              ),
               Text(count == 0 ? '—' : '$count', style: TextStyle(fontSize: 11, color: fg.withValues(alpha: 0.75))),
             ],
           ),
@@ -232,41 +278,39 @@ class _DayChip extends StatelessWidget {
   }
 }
 
-class _Legend extends StatelessWidget {
-  const _Legend();
+class _KeySheet extends StatelessWidget {
+  const _KeySheet();
 
   @override
   Widget build(BuildContext context) {
-    Widget item(GuestKind kind, String label) {
-      final style = KindStyle.of(kind);
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 16,
-            height: 11,
-            decoration: BoxDecoration(
-              color: style.background,
-              border: Border.all(color: style.border),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(label, style: struckStyle(const TextStyle(fontSize: 11.5, color: AppColors.muted), KindStyle.struck(kind))),
-        ],
-      );
-    }
+    Widget item(GuestKind kind, String label, String body) => ListTile(
+      leading: Padding(padding: const EdgeInsets.only(top: 4), child: KindDot(kind)),
+      minLeadingWidth: 12,
+      title: Text(label, style: struckStyle(const TextStyle(fontWeight: FontWeight.w600), KindStyle.struck(kind))),
+      subtitle: Text(body),
+    );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 4,
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          item(GuestKind.expected, 'Expected'),
-          item(GuestKind.late, 'Late'),
-          item(GuestKind.arrived, 'Arrived'),
-          item(GuestKind.gone, 'Not coming'),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text('Key', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          ),
+          item(GuestKind.expected, 'Expected', 'Not here yet.'),
+          item(GuestKind.late, 'Late', 'Past their expected time and not checked in.'),
+          item(GuestKind.arrived, 'Arrived', 'Reception checked them in. They stay on the calendar, struck through.'),
+          item(GuestKind.gone, 'Not coming', 'Cancelled, or marked as a no-show.'),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              'Tip: press and hold a day to open it in Day view.',
+              style: TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );
@@ -283,11 +327,6 @@ class _Agenda extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (guests.isEmpty) {
-      return ListView(
-        children: const [EmptyMessage(icon: Icons.event_available_outlined, title: 'No guests this day')],
-      );
-    }
     final now = loader.nowMinutes;
     final anyTime = guests.where((g) => g.expectedMinutes == null).toList();
     final timed = guests.where((g) => g.expectedMinutes != null).toList()
@@ -303,21 +342,23 @@ class _Agenda extends StatelessWidget {
     }
     if (!placedNow && timed.isNotEmpty) items.add('now');
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final item = items[i];
-        if (item is! Guest) return _NowLine(minutes: now);
-        final kind = item.kind(today: loader.today, nowMinutes: now);
-        return _AgendaRow(
-          guest: item,
-          kind: kind,
-          showHost: showHost,
-          onTap: () => showGuestSheet(context, guest: item, loader: loader),
-        );
-      },
+    return Panel(
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0 && items[i] is Guest && items[i - 1] is Guest) const RowDivider(indent: 40),
+            if (items[i] is Guest)
+              _AgendaRow(
+                guest: items[i] as Guest,
+                kind: (items[i] as Guest).kind(today: loader.today, nowMinutes: now),
+                showHost: showHost,
+                onTap: () => showGuestSheet(context, guest: items[i] as Guest, loader: loader),
+              )
+            else
+              _NowLine(minutes: now),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -327,14 +368,22 @@ class _NowLine extends StatelessWidget {
   final int minutes;
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Text(clockLabel(minutes),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.signal)),
-          const SizedBox(width: 8),
-          Expanded(child: Container(height: 2, color: AppColors.signal)),
-        ],
-      );
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(color: AppColors.signal, borderRadius: BorderRadius.circular(999)),
+          child: Text(
+            'Now · ${clockLabel(minutes)}',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+          ),
+        ),
+        Expanded(child: Container(height: 2, color: AppColors.signal)),
+      ],
+    ),
+  );
 }
 
 class _AgendaRow extends StatelessWidget {
@@ -346,50 +395,61 @@ class _AgendaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = KindStyle.of(kind);
     final struck = KindStyle.struck(kind);
+    final faded = kind == GuestKind.gone;
     final sub = [if (guest.company?.isNotEmpty ?? false) guest.company!, if (showHost) guest.hostName].join(' · ');
-    return Material(
-      color: style.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: style.border)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 58),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 66,
-                  child: Text(guest.expectedLabel ?? 'Any time',
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: AppColors.muted)),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(guest.guestName,
-                          overflow: TextOverflow.ellipsis,
-                          style: struckStyle(TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: style.text), struck)),
-                      if (sub.isNotEmpty)
-                        Text(sub,
-                            overflow: TextOverflow.ellipsis,
-                            style: struckStyle(const TextStyle(fontSize: 12.5, color: AppColors.muted), struck)),
-                    ],
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        child: Row(
+          children: [
+            KindDot(kind),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    guest.expectedLabel ?? 'Any time',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: kind == GuestKind.late ? AppColors.signalDeep : AppColors.muted,
+                    ),
                   ),
-                ),
-                if (guest.hasCar) const Padding(
-                  padding: EdgeInsets.only(left: 6),
-                  child: Icon(Icons.directions_car_outlined, size: 18, color: AppColors.muted),
-                ),
-                const SizedBox(width: 6),
-                _KindTag(guest: guest, kind: kind),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    guest.guestName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: struckStyle(
+                      TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w600,
+                        color: faded ? AppColors.muted : AppColors.ink,
+                      ),
+                      struck,
+                    ),
+                  ),
+                  if (sub.isNotEmpty)
+                    Text(
+                      sub,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: struckStyle(const TextStyle(fontSize: 12.5, color: AppColors.muted), struck),
+                    ),
+                ],
+              ),
             ),
-          ),
+            if (guest.hasCar)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(Icons.directions_car_outlined, size: 18, color: AppColors.muted),
+              ),
+            const SizedBox(width: 10),
+            _KindTag(guest: guest, kind: kind),
+          ],
         ),
       ),
     );
@@ -403,21 +463,27 @@ class _KindTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => switch (kind) {
-        GuestKind.arrived => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check, size: 15, color: AppColors.cleared),
-              const SizedBox(width: 2),
-              Text(guest.checkedInLabel ?? '',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.cleared)),
-            ],
-          ),
-        GuestKind.gone => Text(guest.status == 'NO_SHOW' ? 'No-show' : 'Cancelled',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.idle)),
-        GuestKind.late => const Text('LATE',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.signalDeep)),
-        GuestKind.expected => const SizedBox.shrink(),
-      };
+    GuestKind.arrived => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.check, size: 15, color: AppColors.cleared),
+        const SizedBox(width: 2),
+        Text(
+          guest.checkedInLabel ?? '',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.cleared),
+        ),
+      ],
+    ),
+    GuestKind.gone => Text(
+      guest.status == 'NO_SHOW' ? 'No-show' : 'Cancelled',
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.idle),
+    ),
+    GuestKind.late => const Text(
+      'LATE',
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.signalDeep),
+    ),
+    GuestKind.expected => const SizedBox.shrink(),
+  };
 }
 
 /// Day view: guests placed on an hour grid at their expected time.
@@ -477,110 +543,131 @@ class _TimeGrid extends StatelessWidget {
     }
     close();
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 4, 12, 96),
-      children: [
-        if (anyTime.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 4, 12),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text('ANY TIME', style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: AppColors.muted)),
-                for (final g in anyTime) _AnyTimeChip(guest: g, loader: loader),
-              ],
-            ),
-          ),
-        if (guests.isEmpty) const EmptyMessage(icon: Icons.event_available_outlined, title: 'No guests this day'),
-        SizedBox(
-          height: height + 16,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 58,
-                  height: height,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      for (var h = startHour; h <= endHour; h++)
-                        Positioned(
-                          top: (h - startHour) * hourHeight - 8,
-                          right: 8,
-                          child: Text(
-                            '${h % 12 == 0 ? 12 : h % 12} ${h < 12 || h == 24 ? 'AM' : 'PM'}',
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.muted),
-                          ),
-                        ),
-                    ],
+    return Panel(
+      padding: const EdgeInsets.fromLTRB(0, 14, 12, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (anyTime.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 4, 12),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text(
+                    'ANY TIME',
+                    style: TextStyle(fontFamily: 'monospace', fontSize: 10.5, color: AppColors.muted),
                   ),
-                ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, box) => SizedBox(
-                      height: height,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          for (var h = 0; h <= endHour - startHour; h++)
-                            Positioned(top: h * hourHeight, left: 0, right: 0, child: Container(height: 1, color: AppColors.line)),
-                          Positioned(top: 0, bottom: 0, left: 0, child: Container(width: 1, color: AppColors.line)),
-                          for (final g in timed)
-                            Builder(builder: (context) {
-                              final (lane, count) = lanes[g.id] ?? (0, 1);
-                              final width = (box.maxWidth - 8) / count;
-                              return Positioned(
-                                top: top(g.expectedMinutes!) + 2,
-                                left: 6 + lane * width,
-                                width: width - 4,
-                                height: blockHeight - 4,
-                                child: _Block(
-                                  guest: g,
-                                  kind: g.kind(today: loader.today, nowMinutes: now),
-                                  showHost: showHost,
-                                  compact: count > 1,
-                                  onTap: () => showGuestSheet(context, guest: g, loader: loader),
-                                ),
-                              );
-                            }),
-                          if (isToday && now >= startHour * 60 && now <= endHour * 60)
-                            Positioned(
-                              top: top(now) - 1,
-                              left: -4,
-                              right: 0,
-                              child: IgnorePointer(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 9,
-                                      height: 9,
-                                      decoration: const BoxDecoration(color: AppColors.signal, shape: BoxShape.circle),
+                  for (final g in anyTime) _AnyTimeChip(guest: g, loader: loader),
+                ],
+              ),
+            ),
+          SizedBox(
+            height: height + 16,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 58,
+                    height: height,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        for (var h = startHour; h <= endHour; h++)
+                          Positioned(
+                            top: (h - startHour) * hourHeight - 8,
+                            right: 8,
+                            child: Text(
+                              '${h % 12 == 0 ? 12 : h % 12} ${h < 12 || h == 24 ? 'AM' : 'PM'}',
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.muted),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, box) => SizedBox(
+                        height: height,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            for (var h = 0; h <= endHour - startHour; h++)
+                              Positioned(
+                                top: h * hourHeight,
+                                left: 0,
+                                right: 0,
+                                child: Container(height: 1, color: AppColors.line),
+                              ),
+                            Positioned(top: 0, bottom: 0, left: 0, child: Container(width: 1, color: AppColors.line)),
+                            for (final g in timed)
+                              Builder(
+                                builder: (context) {
+                                  final (lane, count) = lanes[g.id] ?? (0, 1);
+                                  final width = (box.maxWidth - 8) / count;
+                                  return Positioned(
+                                    top: top(g.expectedMinutes!) + 2,
+                                    left: 6 + lane * width,
+                                    width: width - 4,
+                                    height: blockHeight - 4,
+                                    child: _Block(
+                                      guest: g,
+                                      kind: g.kind(today: loader.today, nowMinutes: now),
+                                      showHost: showHost,
+                                      compact: count > 1,
+                                      onTap: () => showGuestSheet(context, guest: g, loader: loader),
                                     ),
-                                    Expanded(child: Container(height: 2, color: AppColors.signal)),
-                                  ],
+                                  );
+                                },
+                              ),
+                            if (isToday && now >= startHour * 60 && now <= endHour * 60)
+                              Positioned(
+                                top: top(now) - 1,
+                                left: -4,
+                                right: 0,
+                                child: IgnorePointer(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 9,
+                                        height: 9,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.signal,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      Expanded(child: Container(height: 2, color: AppColors.signal)),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 class _Block extends StatelessWidget {
-  const _Block({required this.guest, required this.kind, required this.showHost, required this.compact, required this.onTap});
+  const _Block({
+    required this.guest,
+    required this.kind,
+    required this.showHost,
+    required this.compact,
+    required this.onTap,
+  });
   final Guest guest;
   final GuestKind kind;
   final bool showHost;
@@ -594,7 +681,10 @@ class _Block extends StatelessWidget {
     final sub = [if (guest.company?.isNotEmpty ?? false) guest.company!, if (showHost) guest.hostName].join(' · ');
     return Material(
       color: style.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: style.border)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: style.border),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -607,27 +697,36 @@ class _Block extends StatelessWidget {
               Row(
                 children: [
                   Flexible(
-                    child: Text(guest.expectedLabel ?? '',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.muted)),
+                    child: Text(
+                      guest.expectedLabel ?? '',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.muted),
+                    ),
                   ),
                   const SizedBox(width: 6),
-                  if (!compact || kind != GuestKind.expected) Flexible(child: _KindTag(guest: guest, kind: kind)),
+                  if (!compact || kind != GuestKind.expected)
+                    Flexible(
+                      child: _KindTag(guest: guest, kind: kind),
+                    ),
                   if (guest.hasCar && !compact) ...[
                     const Spacer(),
                     const Icon(Icons.directions_car_outlined, size: 15, color: AppColors.muted),
                   ],
                 ],
               ),
-              Text(guest.guestName,
+              Text(
+                guest.guestName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: struckStyle(TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: style.text), struck),
+              ),
+              if (sub.isNotEmpty && !compact)
+                Text(
+                  sub,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: struckStyle(TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: style.text), struck)),
-              if (sub.isNotEmpty && !compact)
-                Text(sub,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: struckStyle(const TextStyle(fontSize: 11.5, color: AppColors.muted), struck)),
+                  style: struckStyle(const TextStyle(fontSize: 11.5, color: AppColors.muted), struck),
+                ),
             ],
           ),
         ),
@@ -647,7 +746,10 @@ class _AnyTimeChip extends StatelessWidget {
     final style = KindStyle.of(kind);
     return Material(
       color: style.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: style.border)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: style.border),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () => showGuestSheet(context, guest: guest, loader: loader),
@@ -656,9 +758,17 @@ class _AnyTimeChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (kind == GuestKind.arrived) ...[const Icon(Icons.check, size: 14, color: AppColors.cleared), const SizedBox(width: 4)],
-              Text(guest.guestName,
-                  style: struckStyle(TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: style.text), KindStyle.struck(kind))),
+              if (kind == GuestKind.arrived) ...[
+                const Icon(Icons.check, size: 14, color: AppColors.cleared),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                guest.guestName,
+                style: struckStyle(
+                  TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: style.text),
+                  KindStyle.struck(kind),
+                ),
+              ),
             ],
           ),
         ),

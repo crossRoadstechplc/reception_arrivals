@@ -53,13 +53,16 @@ class Session extends ChangeNotifier {
       api.token = null;
       user = null;
     }
+    if (signedIn) {
+      // Load floors while the splash is showing (briefly; offline we carry on
+      // and retry from the home screen), then set up alerts in the background.
+      try {
+        await refreshMe().timeout(const Duration(seconds: 8));
+      } catch (_) {}
+      onSignedIn?.call(this);
+    }
     ready = true;
     notifyListeners();
-    if (signedIn) {
-      // Load floors in the background, then set up alerts (they need to know
-      // whether the server can send them).
-      refreshMe().catchError((_) {}).whenComplete(() => onSignedIn?.call(this));
-    }
   }
 
   Future<void> signIn(String email, String password) async {
