@@ -154,3 +154,28 @@ export async function sendGuestArrivedEmail(input: { email: string; guestName: s
 </html>`,
   });
 }
+
+/** For a colleague on the guest's "Also notify" list. */
+export function inviteeArrivedMessage(guestName: string, hostName: string) {
+  return `${guestName} (${hostName}'s guest) has arrived at reception and is on their way up.`;
+}
+
+/** Sent when someone is added to a visit's "Also notify" list. */
+export function inviteeAddedMessage(addedBy: string, guestName: string, when: string) {
+  return `${addedBy} added you to ${guestName}'s visit${when ? ` on ${when}` : ""}. You'll get an alert when they arrive.`;
+}
+
+/** A short one-line notice by email (arrival alerts, "added you" heads-ups). */
+export async function sendNoticeEmail(input: { email: string; subject: string; message: string }) {
+  await sendMail({
+    to: input.email,
+    subject: input.subject,
+    text: input.message,
+    html: `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px 16px;background:#ffffff;color:#14201b;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0;font-size:16px;line-height:1.5;">${escapeHtml(input.message)}</p>
+  </body>
+</html>`,
+  });
+}

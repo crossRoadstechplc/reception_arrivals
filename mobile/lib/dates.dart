@@ -4,8 +4,18 @@ library;
 
 const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const _months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 DateTime _parse(String iso) {
@@ -78,3 +88,37 @@ class OfficeClock {
   final Stopwatch _watch;
   int get minutes => serverMinutes + _watch.elapsed.inMinutes;
 }
+
+/// "November"
+String monthName(String iso) => _months[_parse(iso).month - 1];
+
+/// "November 2026"
+String monthYear(String iso) {
+  final d = _parse(iso);
+  return '${_months[d.month - 1]} ${d.year}';
+}
+
+/// The 1st of the month a date falls in.
+String firstOfMonth(String iso) {
+  final d = _parse(iso);
+  return _format(DateTime.utc(d.year, d.month, 1));
+}
+
+/// Same day [n] months later (clamped to the month's length), e.g. for month paging.
+String addMonths(String iso, int n) {
+  final d = _parse(iso);
+  final first = DateTime.utc(d.year, d.month + n, 1);
+  final lastDay = DateTime.utc(first.year, first.month + 1, 0).day;
+  return _format(DateTime.utc(first.year, first.month, d.day > lastDay ? lastDay : d.day));
+}
+
+/// The six Monday-to-Sunday weeks shown for a month (always 42 days).
+List<String> monthGrid(String iso) {
+  final start = mondayOf(firstOfMonth(iso));
+  return [for (var i = 0; i < 42; i++) addDays(start, i)];
+}
+
+bool sameMonth(String a, String b) => a.substring(0, 7) == b.substring(0, 7);
+
+/// "TUE"
+String weekdayCaps(String iso) => shortWeekday(iso).toUpperCase();

@@ -79,8 +79,7 @@ class Api {
 
   Future<void> saveGuest(GuestInput input) => _send('POST', '/guests', body: input.toJson());
 
-  Future<void> setStatus(String guestId, String status) =>
-      _send('PATCH', '/guests/$guestId', body: {'status': status});
+  Future<void> setStatus(String guestId, String status) => _send('PATCH', '/guests/$guestId', body: {'status': status});
 
   Future<void> deleteGuest(String guestId) => _send('DELETE', '/guests/$guestId');
 

@@ -25,31 +25,45 @@ const label = (time: Time) => `${time.hour}:${pad(time.minute)} ${time.period}`;
  * Clock-dial time picker (like a phone's alarm clock). Same on every device,
  * unlike the browser's time input, which follows the device's 12/24-hour setting.
  * Submits "HH:MM" in 24-hour time, or "" for no time.
+ *
+ * Uncontrolled with `defaultValue`, or controlled with `value` + `onChange`.
  */
-export function TimeField({ name, defaultValue }: { name: string; defaultValue?: string | null }) {
-  const [value, setValue] = useState<Time | null>(() => parse(defaultValue));
+export function TimeField({
+  name,
+  defaultValue,
+  value: controlled,
+  onChange,
+  size = "md",
+}: {
+  name?: string;
+  defaultValue?: string | null;
+  value?: string | null;
+  onChange?: (value: string) => void;
+  size?: "md" | "lg";
+}) {
+  const [own, setOwn] = useState<Time | null>(() => parse(defaultValue));
   const [open, setOpen] = useState(false);
+  const value = controlled !== undefined ? parse(controlled) : own;
+
+  function set(next: Time | null) {
+    if (controlled === undefined) setOwn(next);
+    onChange?.(next ? to24(next) : "");
+  }
 
   return (
     <div className="flex items-center gap-1.5">
-      <input type="hidden" name={name} value={value ? to24(value) : ""} />
+      {name ? <input type="hidden" name={name} value={value ? to24(value) : ""} /> : null}
       <button
         type="button"
-        className="field flex flex-1 items-center justify-between text-left"
+        className={`field flex flex-1 items-center justify-between text-left ${size === "lg" ? "h-14 text-xl" : ""}`}
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       >
-        <span className={value ? "font-mono font-medium" : "text-muted"}>{value ? label(value) : "Set a time"}</span>
+        <span className={value ? "font-mono font-medium" : "text-muted"}>{value ? label(value) : "Any time"}</span>
         <ClockIcon />
       </button>
       {value ? (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm px-2"
-          aria-label="Clear time"
-          title="Clear time"
-          onClick={() => setValue(null)}
-        >
+        <button type="button" className="btn btn-ghost btn-sm px-2" aria-label="Clear time" title="Clear time" onClick={() => set(null)}>
           ✕
         </button>
       ) : null}
@@ -58,7 +72,7 @@ export function TimeField({ name, defaultValue }: { name: string; defaultValue?:
           initial={value ?? { hour: 9, minute: 0, period: "AM" }}
           onCancel={() => setOpen(false)}
           onSave={(next) => {
-            setValue(next);
+            set(next);
             setOpen(false);
           }}
         />

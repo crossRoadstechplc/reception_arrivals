@@ -35,6 +35,7 @@ export default async function ReceptionPage({
         hostUser: { select: { name: true, email: true } },
         createdBy: { select: { name: true, email: true } },
         arrivedBy: { select: { name: true, email: true } },
+        invitees: { include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } },
       },
       orderBy: [{ floor: { number: "asc" } }, { guestName: "asc" }],
     }),
@@ -61,6 +62,10 @@ export default async function ReceptionPage({
           hostName: guest.hostUser?.name || guest.hostName,
           hostHasAccount: Boolean(guest.hostUserId),
           hostNotifiedVia: guest.hostNotifiedVia,
+          alsoNotify: guest.invitees.map((i) => ({
+            name: i.user.name || i.user.email || "Colleague",
+            notifiedVia: i.notifiedVia,
+          })),
           // All time text is made here on the server so every device shows the same thing.
           expectedLabel: formatTimeOfDay(guest.expectedArrival),
           checkedInAt: (guest.arrivedAt ?? guest.clearedAt)?.toISOString() ?? null,

@@ -67,8 +67,25 @@ class GuestLoader extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      final result = await session.api.guests(floorId: floorId, from: _from, to: _to);
+      // The server answers at most 14 days at a time; fetch longer ranges (Month view) in chunks.
+      final chunks = <(String, String)>[];
+      for (var start = _from; start.compareTo(_to) <= 0; start = addDays(chunks.last.$2, 1)) {
+        final end = addDays(start, 13);
+        chunks.add((start, end.compareTo(_to) > 0 ? _to : end));
+      }
+      final parts = await Future.wait(chunks.map((c) => session.api.guests(floorId: floorId, from: c.$1, to: c.$2)));
       if (ticket != _request) return; // a newer request is on its way
+      final first = parts.first;
+      final result = parts.length == 1
+          ? first
+          : GuestRange(
+              today: first.today,
+              officeMinutes: first.officeMinutes,
+              floor: first.floor,
+              hosts: first.hosts,
+              people: first.people,
+              guests: [for (final p in parts) ...p.guests],
+            );
       data = result;
       clock = OfficeClock(result.officeMinutes);
       session.today = result.today;

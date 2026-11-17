@@ -30,11 +30,11 @@ class Floor {
   bool get isAdmin => role == 'ADMIN';
 
   factory Floor.fromJson(Map<String, dynamic> json) => Floor(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        number: (json['number'] as num).toInt(),
-        role: json['role'] as String,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    number: (json['number'] as num).toInt(),
+    role: json['role'] as String,
+  );
 }
 
 class Host {
@@ -63,6 +63,8 @@ class Guest {
     this.notes,
     this.licensePlate,
     this.vehicle,
+    this.notifyUsers = const [],
+    this.invited = false,
   });
 
   final String id;
@@ -84,6 +86,12 @@ class Guest {
   final String? vehicle;
   final bool mine;
   final bool canEdit;
+
+  /// Colleagues on the "Also notify" list.
+  final List<Host> notifyUsers;
+
+  /// You see this guest only because you're on its "Also notify" list.
+  final bool invited;
 
   bool get checkedIn => status == 'ARRIVED' || status == 'CLEARED';
   bool get notComing => status == 'CANCELLED' || status == 'NO_SHOW';
@@ -112,29 +120,33 @@ class Guest {
   }
 
   String get statusLabel => switch (status) {
-        'ARRIVED' || 'CLEARED' => 'Checked in',
-        'CANCELLED' => 'Cancelled',
-        'NO_SHOW' => 'No-show',
-        _ => 'Expected',
-      };
+    'ARRIVED' || 'CLEARED' => 'Checked in',
+    'CANCELLED' => 'Cancelled',
+    'NO_SHOW' => 'No-show',
+    _ => 'Expected',
+  };
 
   factory Guest.fromJson(Map<String, dynamic> json) => Guest(
-        id: json['id'] as String,
-        visitDate: json['visitDate'] as String,
-        guestName: json['guestName'] as String,
-        company: json['company'] as String?,
-        hostName: json['hostName'] as String,
-        hostUserId: json['hostUserId'] as String?,
-        expectedArrival: json['expectedArrival'] as String?,
-        expectedLabel: json['expectedLabel'] as String?,
-        checkedInLabel: json['checkedInLabel'] as String?,
-        status: json['status'] as String,
-        notes: json['notes'] as String?,
-        licensePlate: json['licensePlate'] as String?,
-        vehicle: json['vehicle'] as String?,
-        mine: json['mine'] as bool? ?? false,
-        canEdit: json['canEdit'] as bool? ?? false,
-      );
+    id: json['id'] as String,
+    visitDate: json['visitDate'] as String,
+    guestName: json['guestName'] as String,
+    company: json['company'] as String?,
+    hostName: json['hostName'] as String,
+    hostUserId: json['hostUserId'] as String?,
+    expectedArrival: json['expectedArrival'] as String?,
+    expectedLabel: json['expectedLabel'] as String?,
+    checkedInLabel: json['checkedInLabel'] as String?,
+    status: json['status'] as String,
+    notes: json['notes'] as String?,
+    licensePlate: json['licensePlate'] as String?,
+    vehicle: json['vehicle'] as String?,
+    mine: json['mine'] as bool? ?? false,
+    canEdit: json['canEdit'] as bool? ?? false,
+    notifyUsers: ((json['notifyUsers'] as List?) ?? const [])
+        .map((e) => Host.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    invited: json['invited'] as bool? ?? false,
+  );
 }
 
 class GuestRange {
@@ -144,6 +156,7 @@ class GuestRange {
     required this.floor,
     required this.hosts,
     required this.guests,
+    this.people = const [],
   });
 
   final String today;
@@ -154,13 +167,17 @@ class GuestRange {
   final List<Host> hosts;
   final List<Guest> guests;
 
+  /// Everyone on the floor, for "Also notify".
+  final List<Host> people;
+
   factory GuestRange.fromJson(Map<String, dynamic> json) => GuestRange(
-        today: json['today'] as String,
-        officeMinutes: (json['officeMinutes'] as num).toInt(),
-        floor: Floor.fromJson(json['floor'] as Map<String, dynamic>),
-        hosts: (json['hosts'] as List).map((e) => Host.fromJson(e as Map<String, dynamic>)).toList(),
-        guests: (json['guests'] as List).map((e) => Guest.fromJson(e as Map<String, dynamic>)).toList(),
-      );
+    today: json['today'] as String,
+    officeMinutes: (json['officeMinutes'] as num).toInt(),
+    floor: Floor.fromJson(json['floor'] as Map<String, dynamic>),
+    hosts: (json['hosts'] as List).map((e) => Host.fromJson(e as Map<String, dynamic>)).toList(),
+    guests: (json['guests'] as List).map((e) => Guest.fromJson(e as Map<String, dynamic>)).toList(),
+    people: ((json['people'] as List?) ?? const []).map((e) => Host.fromJson(e as Map<String, dynamic>)).toList(),
+  );
 }
 
 class Me {
@@ -171,11 +188,11 @@ class Me {
   final bool alertsAvailable;
 
   factory Me.fromJson(Map<String, dynamic> json) => Me(
-        user: AppUser.fromJson(json['user'] as Map<String, dynamic>),
-        floors: (json['floors'] as List).map((e) => Floor.fromJson(e as Map<String, dynamic>)).toList(),
-        today: json['today'] as String,
-        alertsAvailable: json['alertsAvailable'] as bool? ?? false,
-      );
+    user: AppUser.fromJson(json['user'] as Map<String, dynamic>),
+    floors: (json['floors'] as List).map((e) => Floor.fromJson(e as Map<String, dynamic>)).toList(),
+    today: json['today'] as String,
+    alertsAvailable: json['alertsAvailable'] as bool? ?? false,
+  );
 }
 
 /// What the guest form sends. Matches SaveGuestInput on the server.
@@ -192,6 +209,7 @@ class GuestInput {
     this.notes = '',
     this.licensePlate = '',
     this.vehicle = '',
+    this.notifyUserIds = const [],
   });
 
   final String? id;
@@ -205,20 +223,22 @@ class GuestInput {
   final String notes;
   final String licensePlate;
   final String vehicle;
+  final List<String> notifyUserIds;
 
   Map<String, dynamic> toJson() => {
-        if (id != null) 'id': id,
-        'floorId': floorId,
-        'visitDate': visitDate,
-        'guestName': guestName,
-        'company': company,
-        if (hostUserId != null) 'hostUserId': hostUserId,
-        'hostName': hostName,
-        'expectedArrival': expectedArrival,
-        'notes': notes,
-        'licensePlate': licensePlate,
-        'vehicle': vehicle,
-      };
+    if (id != null) 'id': id,
+    'floorId': floorId,
+    'visitDate': visitDate,
+    'guestName': guestName,
+    'company': company,
+    if (hostUserId != null) 'hostUserId': hostUserId,
+    'hostName': hostName,
+    'expectedArrival': expectedArrival,
+    'notes': notes,
+    'licensePlate': licensePlate,
+    'vehicle': vehicle,
+    'notifyUserIds': notifyUserIds,
+  };
 }
 
 /// Sentinel the server uses for "someone without an account" as host.

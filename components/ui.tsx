@@ -93,7 +93,7 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }) {
   const titleId = useId();
   const closeRef = useRef(onClose);
@@ -114,7 +114,8 @@ export function Modal({
     };
   }, []);
 
-  const width = size === "sm" ? "sm:max-w-sm" : size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg";
+  const width =
+    size === "sm" ? "sm:max-w-sm" : size === "lg" ? "sm:max-w-2xl" : size === "xl" ? "sm:max-w-3xl" : "sm:max-w-lg";
 
   return (
     <div

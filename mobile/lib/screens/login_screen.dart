@@ -72,7 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextSpan(
                         children: [
                           TextSpan(text: 'Arrival '),
-                          TextSpan(text: 'Desk', style: TextStyle(color: AppColors.signal)),
+                          TextSpan(
+                            text: 'Desk',
+                            style: TextStyle(color: AppColors.signal),
+                          ),
                         ],
                       ),
                       textAlign: TextAlign.center,
@@ -83,7 +86,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(12)),
-                        child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500)),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500),
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -116,10 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
                     ),
                     const SizedBox(height: 20),
-                    FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: Text(_busy ? 'Signing in…' : 'Sign in'),
-                    ),
+                    FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Signing in…' : 'Sign in')),
                     const SizedBox(height: 20),
                     Text(
                       'Forgot your password? Reset it on the website:\n${Uri.parse(apiBaseUrl).host}',

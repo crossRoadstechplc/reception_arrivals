@@ -56,6 +56,8 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   pushSubscriptions    PushSubscription[]
   deviceTokens         DeviceToken[]
+  guestInvites         GuestInvitee[]       @relation("GuestInvitee")
+  guestInvitesSent     GuestInvitee[]       @relation("GuestInvitedBy")
 
   @@map("users")
 }
@@ -183,6 +185,7 @@ model Guest {
   clearedBy User? @relation("GuestClearedBy", fields: [clearedById], references: [id], onDelete: SetNull)
   hostUser  User? @relation("GuestHost", fields: [hostUserId], references: [id], onDelete: SetNull)
   arrivedBy User? @relation("GuestArrivedBy", fields: [arrivedById], references: [id], onDelete: SetNull)
+  invitees  GuestInvitee[]
 
   @@index([visitDate, floorId])
   @@index([visitDate, status])
@@ -219,4 +222,25 @@ model DeviceToken {
 
   @@index([userId])
   @@map("device_tokens")
+}
+
+/// A colleague on the guest's floor who is told about the visit ("Also notify"):
+/// they see the guest and get the arrival alert with the host, but can't edit it.
+model GuestInvitee {
+  id          String    @id @default(cuid())
+  guestId     String    @map("guest_id")
+  userId      String    @map("user_id")
+  invitedById String?   @map("invited_by_id")
+  /// When they were told the guest arrived, and how ("push", "email", "push+email", "none").
+  notifiedAt  DateTime? @map("notified_at")
+  notifiedVia String?   @map("notified_via")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  guest     Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  user      User  @relation("GuestInvitee", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("GuestInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([guestId, userId])
+  @@index([userId])
+  @@map("guest_invitees")
 }

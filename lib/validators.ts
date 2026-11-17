@@ -16,6 +16,8 @@ export const guestInputSchema = z.object({
   notes: z.string().trim().max(500).optional().or(z.literal("")),
   licensePlate: z.string().trim().max(20, "That plate number is too long").optional().or(z.literal("")),
   vehicle: z.string().trim().max(80).optional().or(z.literal("")),
+  /** "Also notify": colleagues on the floor told about the visit. */
+  notifyUserIds: z.array(z.string().min(1).max(64)).max(25, "That's too many people to notify").optional(),
 });
 
 export const floorInputSchema = z.object({

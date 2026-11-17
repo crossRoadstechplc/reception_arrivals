@@ -54,15 +54,27 @@ ThemeData buildTheme() {
       color: AppColors.panel,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16)), side: BorderSide(color: AppColors.line)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        side: BorderSide(color: AppColors.line),
+      ),
     ),
     inputDecorationTheme: const InputDecorationTheme(
       filled: true,
       fillColor: AppColors.panel,
       contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: AppColors.lineStrong)),
-      enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: AppColors.lineStrong)),
-      focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: AppColors.ink, width: 1.6)),
+      border: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: AppColors.lineStrong),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: AppColors.lineStrong),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: AppColors.ink, width: 1.6),
+      ),
       labelStyle: TextStyle(color: AppColors.muted),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -84,7 +96,10 @@ ThemeData buildTheme() {
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: AppColors.ink, textStyle: const TextStyle(fontWeight: FontWeight.w600)),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.ink,
+        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+      ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: AppColors.panel,

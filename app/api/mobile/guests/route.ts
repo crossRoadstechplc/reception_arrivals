@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { isISODate, officeMinutesNow, officeTodayISO, shiftISO, toDateOnly } from "@/lib/dates";
-import { byExpectedTime, guestScope, loadFloorContext, toFloorGuest } from "@/lib/floor-context";
+import { byExpectedTime, floorGuestInclude, guestScope, loadFloorContext, toFloorGuest } from "@/lib/floor-context";
 import { saveGuestAs, type SaveGuestInput } from "@/lib/guest-service";
 import { withMobileUser } from "@/lib/mobile-auth";
-import { canEditGuest } from "@/lib/permissions";
 
 const MAX_DAYS = 14;
 
@@ -21,12 +20,12 @@ export async function GET(request: Request) {
     if (to < from) to = from;
     if (to > shiftISO(from, MAX_DAYS - 1)) to = shiftISO(from, MAX_DAYS - 1);
 
-    const { floors, floorId, myRole, isAdmin, hosts } = await loadFloorContext(user, url.searchParams.get("floor") ?? undefined);
+    const { floors, floorId, myRole, isAdmin, hosts, people } = await loadFloorContext(user, url.searchParams.get("floor") ?? undefined);
     if (!floorId) return NextResponse.json({ error: "You're not on a floor yet. Ask a super admin to add you." }, { status: 404 });
 
     const guests = await db.guest.findMany({
       where: { floorId, visitDate: { gte: toDateOnly(from), lte: toDateOnly(to) }, ...guestScope(user, isAdmin) },
-      include: { hostUser: { select: { name: true, email: true } } },
+      include: floorGuestInclude,
     });
 
     return NextResponse.json({
@@ -37,12 +36,9 @@ export async function GET(request: Request) {
       floor: floors.find((f) => f.id === floorId),
       role: myRole,
       hosts: isAdmin ? hosts : [],
+      people,
       guests: guests
-        .map((guest) => ({
-          ...toFloorGuest(guest),
-          mine: guest.hostUserId === user.id,
-          canEdit: canEditGuest(user, guest),
-        }))
+        .map((guest) => toFloorGuest(guest, user))
         .sort((a, b) => a.visitDate.localeCompare(b.visitDate) || byExpectedTime(a, b)),
     });
   });

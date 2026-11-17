@@ -29,33 +29,48 @@ class _HomeScreenState extends State<HomeScreen> {
             body: Center(
               child: EmptyMessage(
                 icon: Icons.apartment_outlined,
-                title: session.floors.isEmpty && session.today == null ? 'Loading your floors…' : 'You’re not on a floor yet',
+                title: session.floors.isEmpty && session.today == null
+                    ? 'Loading your floors…'
+                    : 'You’re not on a floor yet',
                 body: session.today == null ? null : 'Ask a super admin to add you to your floor.',
-                action: OutlinedButton(onPressed: () => session.refreshMe().catchError((_) {}), child: const Text('Try again')),
+                action: OutlinedButton(
+                  onPressed: () => session.refreshMe().catchError((_) {}),
+                  child: const Text('Try again'),
+                ),
               ),
             ),
           );
         }
         return Scaffold(
-          appBar: AppBar(
-            titleSpacing: 16,
-            title: _FloorTitle(),
-          ),
+          // The Calendar tab draws its own calendar-style top bar.
+          appBar: _tab == 1 ? null : AppBar(titleSpacing: 16, title: _FloorTitle()),
           body: IndexedStack(
             index: _tab,
-            children: const [GuestsScreen(), CalendarScreen(), SettingsScreen()],
+            children: [
+              const GuestsScreen(),
+              CalendarScreen(onOpenSettings: () => setState(() => _tab = 2)),
+              const SettingsScreen(),
+            ],
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tab,
             onDestinationSelected: (i) => setState(() => _tab = i),
             destinations: const [
-              NavigationDestination(icon: Icon(Icons.list_alt_outlined), selectedIcon: Icon(Icons.list_alt), label: 'Guests'),
+              NavigationDestination(
+                icon: Icon(Icons.list_alt_outlined),
+                selectedIcon: Icon(Icons.list_alt),
+                label: 'Guests',
+              ),
               NavigationDestination(
                 icon: Icon(Icons.calendar_month_outlined),
                 selectedIcon: Icon(Icons.calendar_month),
                 label: 'Calendar',
               ),
-              NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'Settings',
+              ),
             ],
           ),
         );
@@ -75,9 +90,18 @@ class _FloorTitle extends StatelessWidget {
       children: [
         Text(
           floor.isAdmin ? 'FLOOR ADMIN' : 'MY GUESTS',
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.4, color: AppColors.signal),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+            color: AppColors.signal,
+          ),
         ),
-        Text(floor.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+        Text(
+          floor.name,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
       ],
     );
     if (session.floors.length < 2) return title;
@@ -90,7 +114,10 @@ class _FloorTitle extends StatelessWidget {
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [Flexible(child: title), const Icon(Icons.arrow_drop_down)],
+        children: [
+          Flexible(child: title),
+          const Icon(Icons.arrow_drop_down),
+        ],
       ),
     );
   }

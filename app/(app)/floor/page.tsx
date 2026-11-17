@@ -4,7 +4,7 @@ import { FloorTabs } from "@/components/floor/floor-tabs";
 import { GuestManager } from "@/components/floor/guest-manager";
 import { db } from "@/lib/db";
 import { formatOfficeDate, isISODate, officeTodayISO, toDateOnly } from "@/lib/dates";
-import { byExpectedTime, guestScope, loadFloorContext, toFloorGuest } from "@/lib/floor-context";
+import { byExpectedTime, floorGuestInclude, guestScope, loadFloorContext, toFloorGuest } from "@/lib/floor-context";
 import { requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
 
@@ -20,12 +20,12 @@ export default async function FloorPage({
   const today = officeTodayISO();
   const date = params.date && isISODate(params.date) ? params.date : today;
 
-  const { floors, floorId, myRole, isAdmin, hosts } = await loadFloorContext(user, params.floor);
+  const { floors, floorId, myRole, isAdmin, hosts, people } = await loadFloorContext(user, params.floor);
 
   const guests = floorId
     ? await db.guest.findMany({
         where: { floorId, visitDate: toDateOnly(date), ...guestScope(user, isAdmin) },
-        include: { hostUser: { select: { name: true, email: true } } },
+        include: floorGuestInclude,
       })
     : [];
 
@@ -44,7 +44,8 @@ export default async function FloorPage({
         myRole={myRole}
         currentUserId={user.id}
         hosts={hosts}
-        guests={guests.map(toFloorGuest).sort(byExpectedTime)}
+        people={people}
+        guests={guests.map((g) => toFloorGuest(g, user)).sort(byExpectedTime)}
       />
     </main>
   );

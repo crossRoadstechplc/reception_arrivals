@@ -17,6 +17,8 @@ export type BoardGuest = {
   hostName: string;
   hostHasAccount: boolean;
   hostNotifiedVia: string | null;
+  /** Colleagues on the guest's "Also notify" list, and how each was alerted. */
+  alsoNotify: { name: string; notifiedVia: string | null }[];
   /** Time text is made on the server so every device shows the same thing. */
   expectedLabel: string | null;
   checkedInAt: string | null;
@@ -528,18 +530,32 @@ const ALERT_LABEL: Record<string, string> = {
 function HostAlert({ guest, compact = false }: { guest: BoardGuest; compact?: boolean }) {
   if (tabOf(guest.status) !== "in") return null;
   const base = compact ? "text-xs" : "text-sm";
+  const others = guest.alsoNotify.length;
+  const plus = others ? ` + ${others} other${others === 1 ? "" : "s"}` : "";
   if (!guest.hostHasAccount) {
-    return <p className={`${base} font-medium text-expected`}>Host not on Arrival Desk. Let them know</p>;
+    return (
+      <p className={`${base} font-medium text-expected`}>
+        Host not on Arrival Desk. Let them know{others ? ` (alerting ${others} colleague${others === 1 ? "" : "s"})` : ""}
+      </p>
+    );
   }
-  if (!guest.hostNotifiedVia) return <p className={`${base} text-muted`}>Alerting host…</p>;
+  if (!guest.hostNotifiedVia) return <p className={`${base} text-muted`}>Alerting host{plus}…</p>;
   const ok = guest.hostNotifiedVia !== "none";
   return (
     <p className={`${base} inline-flex items-center gap-1 font-medium ${ok ? "text-muted" : "text-expected"}`}>
       {ok ? <CheckIcon className="size-3.5 text-cleared" /> : null}
       {ALERT_LABEL[guest.hostNotifiedVia] ?? "Host alerted"}
+      {plus}
     </p>
   );
 }
+
+const PERSON_ALERT: Record<string, string> = {
+  push: "alerted on device",
+  email: "emailed",
+  "push+email": "alerted on device and by email",
+  none: "no alerts set up",
+};
 
 /* ---------------- Details panel ---------------- */
 
@@ -689,6 +705,22 @@ function VisitorPanel({
             ))}
           </ol>
         </section>
+
+        {guest.alsoNotify.length ? (
+          <section>
+            <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">Also notified on arrival</h3>
+            <ul className="grid gap-1.5 text-sm">
+              {guest.alsoNotify.map((person) => (
+                <li key={person.name} className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{person.name}</span>
+                  <span className={`text-xs ${person.notifiedVia === "none" ? "text-expected" : "text-muted"}`}>
+                    {tab === "in" ? (person.notifiedVia ? PERSON_ALERT[person.notifiedVia] ?? person.notifiedVia : "alerting…") : "on arrival"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <DeskNote guest={guest} onSaved={onSaved} />
       </div>

@@ -1,18 +1,17 @@
 "use client";
 
 import { RefreshButton } from "@/components/refresh-button";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteGuest, saveGuest, setFloorGuestStatus } from "@/lib/actions/guests";
-import { TimeField } from "@/components/time-field";
-import { FLOOR_ROLE_LABEL, OTHER_HOST, type FloorRole, type GuestStatus } from "@/lib/types";
+import { deleteGuest, setFloorGuestStatus } from "@/lib/actions/guests";
+import { GuestForm } from "@/components/floor/guest-form";
+import { FLOOR_ROLE_LABEL, type FloorRole, type GuestStatus } from "@/lib/types";
 import {
   Alert,
   ConfirmDialog,
   DateHeading,
   DateNav,
   EmptyState,
-  Modal,
   StatTile,
   StatusBadge,
   Toast,
@@ -21,7 +20,7 @@ import {
 } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
 import { PushPrompt } from "@/components/push-prompt";
-import { BuildingIcon, CarIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
+import { BellIcon, BuildingIcon, CarIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
 export type FloorGuest = {
   id: string;
@@ -38,6 +37,12 @@ export type FloorGuest = {
   vehicle: string | null;
   expectedLabel: string | null;
   checkedInLabel: string | null;
+  /** Colleagues on the "Also notify" list. */
+  notifyUsers: { id: string; name: string }[];
+  /** You see this guest only because you're on its "Also notify" list. */
+  invited: boolean;
+  mine: boolean;
+  canEdit: boolean;
 };
 
 type FloorOption = { id: string; name: string; number: number; role: FloorRole };
@@ -52,6 +57,7 @@ export function GuestManager({
   myRole,
   currentUserId,
   hosts,
+  people,
   guests,
 }: {
   date: string;
@@ -62,6 +68,8 @@ export function GuestManager({
   myRole: FloorRole | null;
   currentUserId: string;
   hosts: HostOption[];
+  /** Everyone on the floor, for "Also notify". */
+  people: HostOption[];
   guests: FloorGuest[];
 }) {
   const router = useRouter();
@@ -76,6 +84,10 @@ export function GuestManager({
   const floor = floors.find((item) => item.id === floorId);
   const isAdmin = myRole === "ADMIN";
   const isPast = date < today;
+  const recentCompanies = useMemo(
+    () => [...new Set(guests.map((g) => g.company?.trim()).filter((c): c is string => Boolean(c)))],
+    [guests],
+  );
 
   const counts = useMemo(
     () => ({
@@ -239,6 +251,9 @@ export function GuestManager({
                             {guest.guestName}
                           </h2>
                           <StatusBadge status={guest.status} />
+                          {guest.invited ? (
+                            <span className="badge bg-arrived-soft text-arrived">Invited by {guest.hostName}</span>
+                          ) : null}
                         </div>
                         <p className="mt-0.5 text-sm text-muted">
                           {guest.company ? <span className="font-medium text-ink-soft">{guest.company} · </span> : null}
@@ -253,6 +268,12 @@ export function GuestManager({
                             </span>
                           ) : null}
                         </p>
+                        {guest.notifyUsers.length ? (
+                          <p className="mt-1.5 inline-flex max-w-full items-start gap-1.5 text-xs text-muted">
+                            <BellIcon className="mt-px size-3.5 shrink-0" />
+                            <span>Also notifying {guest.notifyUsers.map((u) => (u.id === currentUserId ? "you" : u.name)).join(", ")}</span>
+                          </p>
+                        ) : null}
                         {guest.licensePlate || guest.vehicle ? (
                           <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
                             <CarIcon className="size-4 shrink-0" />
@@ -268,7 +289,7 @@ export function GuestManager({
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-1.5 pl-[5.5rem] sm:pl-0">
+                    <div className={`flex shrink-0 gap-1.5 pl-[5.5rem] sm:pl-0 ${guest.canEdit ? "" : "hidden"}`}>
                       {guest.status !== "CLEARED" && !inactive ? (
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(guest)}>
                           <PencilIcon className="size-3.5" />
@@ -320,11 +341,14 @@ export function GuestManager({
       {editing && floorId ? (
         <GuestForm
           date={editing === "new" && date < today ? today : date}
+          today={today}
           floorId={floorId}
           floorName={floor?.name ?? ""}
           isAdmin={isAdmin}
           currentUserId={currentUserId}
           hosts={hosts}
+          people={people}
+          recentCompanies={recentCompanies}
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
@@ -347,243 +371,3 @@ export function GuestManager({
     </div>
   );
 }
-
-export function GuestForm({
-  date,
-  floorId,
-  floorName,
-  isAdmin,
-  currentUserId,
-  hosts,
-  guest,
-  onClose,
-  onSaved,
-}: {
-  date: string;
-  floorId: string;
-  floorName: string;
-  isAdmin: boolean;
-  currentUserId: string;
-  hosts: HostOption[];
-  guest: FloorGuest | null;
-  onClose: () => void;
-  onSaved: (name: string, isNew: boolean) => void;
-}) {
-  const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [addedCount, setAddedCount] = useState(0);
-  const [pending, startTransition] = useTransition();
-  const keepOpen = useRef(false);
-  const [byCar, setByCar] = useState(Boolean(guest?.licensePlate || guest?.vehicle));
-  const [hostChoice, setHostChoice] = useState<string>(
-    guest ? (guest.hostUserId ?? OTHER_HOST) : currentUserId,
-  );
-
-  function onSubmit(formData: FormData) {
-    setError(null);
-    const another = keepOpen.current;
-    keepOpen.current = false;
-    startTransition(async () => {
-      const guestName = String(formData.get("guestName") ?? "");
-      const result = await saveGuest({
-        id: guest?.id,
-        floorId,
-        visitDate: String(formData.get("visitDate") ?? date),
-        guestName,
-        company: String(formData.get("company") ?? ""),
-        hostUserId: isAdmin ? hostChoice : currentUserId,
-        hostName: String(formData.get("hostName") ?? ""),
-        expectedArrival: String(formData.get("expectedArrival") ?? ""),
-        notes: String(formData.get("notes") ?? ""),
-        licensePlate: byCar ? String(formData.get("licensePlate") ?? "") : "",
-        vehicle: byCar ? String(formData.get("vehicle") ?? "") : "",
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-      onSaved(guestName.trim(), !guest);
-      if (another && !guest) {
-        // Keep date, host and company; clear the per-guest fields.
-        const form = formRef.current;
-        if (form) {
-          (form.elements.namedItem("guestName") as HTMLInputElement).value = "";
-          (form.elements.namedItem("notes") as HTMLTextAreaElement).value = "";
-        }
-        setByCar(false);
-        setAddedCount((count) => count + 1);
-        nameRef.current?.focus();
-        return;
-      }
-      onClose();
-    });
-  }
-
-  return (
-    <Modal
-      title={guest ? "Edit guest" : "Add guest"}
-      description={
-        addedCount > 0
-          ? `${addedCount} added so far. Host and company are kept for the next one.`
-          : `${floorName} · reception will see this at the front desk.`
-      }
-      onClose={onClose}
-      footer={
-        <>
-          <button type="button" className="btn btn-ghost mr-auto" onClick={onClose}>
-            {addedCount > 0 ? "Done" : "Cancel"}
-          </button>
-          {!guest ? (
-            <button
-              type="submit"
-              form="guest-form"
-              className="btn btn-secondary"
-              disabled={pending}
-              onClick={() => {
-                keepOpen.current = true;
-              }}
-            >
-              Save & add another
-            </button>
-          ) : null}
-          <button type="submit" form="guest-form" className="btn btn-primary" disabled={pending}>
-            {pending ? "Saving…" : guest ? "Save changes" : "Save guest"}
-          </button>
-        </>
-      }
-    >
-      <form id="guest-form" ref={formRef} action={onSubmit} className="grid gap-4">
-        <label>
-          <span className="label">Guest name</span>
-          <input
-            ref={nameRef}
-            className="field"
-            name="guestName"
-            defaultValue={guest?.guestName ?? ""}
-            placeholder="Full name"
-            autoFocus
-            required
-            minLength={2}
-          />
-        </label>
-        <label>
-          <span className="label">
-            Company <span className="font-normal text-muted">(optional)</span>
-          </span>
-          <input className="field" name="company" defaultValue={guest?.company ?? ""} />
-        </label>
-
-        {isAdmin ? (
-          <div className="grid gap-2">
-            <label>
-              <span className="label">Who are they visiting?</span>
-              <select className="field" value={hostChoice} onChange={(event) => setHostChoice(event.target.value)}>
-                {guest?.hostUserId && !hosts.some((h) => h.id === guest.hostUserId) ? (
-                  <option value={guest.hostUserId}>{guest.hostName} (no longer on this floor)</option>
-                ) : null}
-                {hosts.map((host) => (
-                  <option key={host.id} value={host.id}>
-                    {host.id === currentUserId ? `Me (${host.name})` : host.name}
-                  </option>
-                ))}
-                <option value={OTHER_HOST}>Someone else (type a name)</option>
-              </select>
-            </label>
-            {hostChoice === OTHER_HOST ? (
-              <input
-                className="field"
-                name="hostName"
-                defaultValue={guest && !guest.hostUserId ? guest.hostName : ""}
-                placeholder="Host's name"
-                required
-                minLength={2}
-              />
-            ) : (
-              <p className="hint -mt-1">They&apos;ll get an alert when reception checks the guest in.</p>
-            )}
-          </div>
-        ) : (
-          <p className="rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">
-            You&apos;re the host. You&apos;ll get an alert when reception checks them in.
-          </p>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label>
-            <span className="label">Visit date</span>
-            <input className="field" type="date" name="visitDate" defaultValue={date} required />
-          </label>
-          <label>
-            <span className="label">
-              Expected time <span className="font-normal text-muted">(optional)</span>
-            </span>
-            {/* Keyed so "Save & add another" clears it for the next guest. */}
-            <TimeField key={addedCount} name="expectedArrival" defaultValue={guest?.expectedArrival} />
-          </label>
-        </div>
-        <div className="rounded-xl border border-line">
-          <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5">
-            <input
-              type="checkbox"
-              className="size-4 accent-[var(--ink)]"
-              checked={byCar}
-              onChange={(event) => setByCar(event.target.checked)}
-            />
-            <CarIcon className="size-5 text-muted" />
-            <span className="flex-1">
-              <span className="block text-sm font-semibold">Coming by car</span>
-              <span className="block text-xs text-muted">Reception will arrange parking for them.</span>
-            </span>
-          </label>
-          {byCar ? (
-            <div className="grid gap-3 border-t border-line p-3 sm:grid-cols-[11rem_1fr]">
-              <label>
-                <span className="label">
-                  License plate <span className="font-normal text-muted">(optional)</span>
-                </span>
-                <input
-                  className="field font-mono uppercase"
-                  name="licensePlate"
-                  defaultValue={guest?.licensePlate ?? ""}
-                  placeholder="e.g. AA 3-B12345"
-                  maxLength={20}
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                />
-              </label>
-              <label>
-                <span className="label">
-                  Car <span className="font-normal text-muted">(optional)</span>
-                </span>
-                <input
-                  className="field"
-                  name="vehicle"
-                  defaultValue={guest?.vehicle ?? ""}
-                  placeholder="e.g. White Toyota Corolla"
-                  maxLength={80}
-                />
-              </label>
-            </div>
-          ) : null}
-        </div>
-        <label>
-          <span className="label">
-            Notes for reception <span className="font-normal text-muted">(optional)</span>
-          </span>
-          <textarea
-            className="field"
-            name="notes"
-            defaultValue={guest?.notes ?? ""}
-            placeholder="e.g. Bring to meeting room 3"
-            maxLength={500}
-          />
-        </label>
-        {error ? <Alert>{error}</Alert> : null}
-      </form>
-    </Modal>
-  );
-}
-

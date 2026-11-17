@@ -15,7 +15,7 @@ import {
   toDateOnly,
   weekdayOf,
 } from "@/lib/dates";
-import { byExpectedTime, guestScope, loadFloorContext, toFloorGuest } from "@/lib/floor-context";
+import { byExpectedTime, floorGuestInclude, guestScope, loadFloorContext, toFloorGuest } from "@/lib/floor-context";
 import { requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
 
@@ -32,7 +32,7 @@ export default async function FloorCalendarPage({
   const date = params.date && isISODate(params.date) ? params.date : today;
   const view: CalendarView = params.view === "day" ? "day" : "week";
 
-  const { floors, floorId, myRole, isAdmin, hosts } = await loadFloorContext(user, params.floor);
+  const { floors, floorId, myRole, isAdmin, hosts, people } = await loadFloorContext(user, params.floor);
 
   const first = view === "day" ? date : mondayOf(date);
   const last = view === "day" ? date : shiftISO(first, 6);
@@ -44,10 +44,10 @@ export default async function FloorCalendarPage({
           visitDate: { gte: toDateOnly(first), lte: toDateOnly(last) },
           ...guestScope(user, isAdmin),
         },
-        include: { hostUser: { select: { name: true, email: true } } },
+        include: floorGuestInclude,
       })
     : [];
-  const items = guests.map(toFloorGuest).sort(byExpectedTime);
+  const items = guests.map((g) => toFloorGuest(g, user)).sort(byExpectedTime);
 
   // Week view: Monday to Friday, plus Saturday/Sunday only when something is on.
   const days: string[] = [];
@@ -82,6 +82,7 @@ export default async function FloorCalendarPage({
         myRole={myRole}
         currentUserId={user.id}
         hosts={hosts}
+        people={people}
         guests={items}
       />
     </main>

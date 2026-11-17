@@ -59,7 +59,7 @@ class _GuestsScreenState extends State<GuestsScreen> {
 
   Future<void> _add() async {
     final today = _loader.today;
-    final saved = await openGuestForm(context, date: _date.compareTo(today) < 0 ? today : _date, hosts: _loader.data?.hosts ?? []);
+    final saved = await openGuestForm(context, date: _date.compareTo(today) < 0 ? today : _date, data: _loader.data);
     if (saved) _loader.load(quiet: true);
   }
 
@@ -83,26 +83,26 @@ class _GuestsScreenState extends State<GuestsScreen> {
           final gone = guests.where((g) => g.notComing).toList();
 
           Widget section(String title, List<Guest> list, Color color) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SectionHeader(title, count: list.length, color: color),
-                  Panel(
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < list.length; i++) ...[
-                          if (i > 0) const RowDivider(indent: 92),
-                          GuestRow(
-                            guest: list[i],
-                            kind: list[i].kind(today: today, nowMinutes: now),
-                            showHost: isAdmin,
-                            onTap: () => showGuestSheet(context, guest: list[i], loader: _loader),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              );
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionHeader(title, count: list.length, color: color),
+              Panel(
+                child: Column(
+                  children: [
+                    for (var i = 0; i < list.length; i++) ...[
+                      if (i > 0) const RowDivider(indent: 92),
+                      GuestRow(
+                        guest: list[i],
+                        kind: list[i].kind(today: today, nowMinutes: now),
+                        showHost: isAdmin,
+                        onTap: () => showGuestSheet(context, guest: list[i], loader: _loader),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          );
 
           return RefreshIndicator(
             onRefresh: () => _loader.load(quiet: true),
@@ -143,7 +143,10 @@ class _GuestsScreenState extends State<GuestsScreen> {
                     child: ErrorBanner(message: _loader.error!, onRetry: _loader.load),
                   ),
                 if (_loader.data == null && _loader.loading)
-                  const Padding(padding: EdgeInsets.only(top: 64), child: Center(child: CircularProgressIndicator()))
+                  const Padding(
+                    padding: EdgeInsets.only(top: 64),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                 else if (guests.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
@@ -186,48 +189,52 @@ class _DateBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-        child: Row(
-          children: [
-            IconButton(tooltip: 'Previous day', onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: onPick,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                  child: Column(
+    padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+    child: Row(
+      children: [
+        IconButton(tooltip: 'Previous day', onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
+        Expanded(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onPick,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Flexible(
-                            child: Text(label,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3)),
-                          ),
-                          const Icon(Icons.arrow_drop_down, color: AppColors.muted),
-                        ],
-                      ),
-                      if (sub != null) Text(sub!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                      if (!isToday)
-                        GestureDetector(
-                          onTap: onToday,
-                          child: const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: Text('Back to today',
-                                style: TextStyle(color: AppColors.signalDeep, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                          ),
+                      Flexible(
+                        child: Text(
+                          label,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
                         ),
+                      ),
+                      const Icon(Icons.arrow_drop_down, color: AppColors.muted),
                     ],
                   ),
-                ),
+                  if (sub != null) Text(sub!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                  if (!isToday)
+                    GestureDetector(
+                      onTap: onToday,
+                      child: const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Back to today',
+                          style: TextStyle(color: AppColors.signalDeep, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            IconButton(tooltip: 'Next day', onPressed: onNext, icon: const Icon(Icons.chevron_right)),
-          ],
+          ),
         ),
-      );
+        IconButton(tooltip: 'Next day', onPressed: onNext, icon: const Icon(Icons.chevron_right)),
+      ],
+    ),
+  );
 }
 
 class _Stat extends StatelessWidget {
@@ -238,17 +245,20 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            children: [
-              Text('$count', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: color, height: 1.1)),
-              const SizedBox(height: 2),
-              Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: color, height: 1.1),
           ),
-        ),
-      );
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+        ],
+      ),
+    ),
+  );
 }
 
 /// One guest inside a section panel: time on the left, details in the middle.
@@ -264,26 +274,33 @@ class GuestRow extends StatelessWidget {
     final gone = kind == GuestKind.gone;
     final sub = [
       if (guest.company?.isNotEmpty ?? false) guest.company!,
-      if (showHost) guest.mine ? 'Host: you' : 'Host: ${guest.hostName}',
+      if (showHost && !guest.invited) guest.mine ? 'Host: you' : 'Host: ${guest.hostName}',
+      if (guest.invited) 'Invited by ${guest.hostName}',
     ].join(' · ');
 
     final timeNote = switch (kind) {
-      GuestKind.late => const Text('LATE',
-          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.signalDeep)),
+      GuestKind.late => const Text(
+        'LATE',
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.signalDeep),
+      ),
       GuestKind.arrived => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check, size: 13, color: AppColors.cleared),
-            const SizedBox(width: 2),
-            Flexible(
-              child: Text(guest.checkedInLabel ?? '',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.cleared)),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check, size: 13, color: AppColors.cleared),
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              guest.checkedInLabel ?? '',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.cleared),
             ),
-          ],
-        ),
-      GuestKind.gone => Text(guest.status == 'NO_SHOW' ? 'No-show' : 'Cancelled',
-          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted)),
+          ),
+        ],
+      ),
+      GuestKind.gone => Text(
+        guest.status == 'NO_SHOW' ? 'No-show' : 'Cancelled',
+        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+      ),
       GuestKind.expected => null,
     };
 
@@ -320,26 +337,39 @@ class GuestRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: struckStyle(
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: gone ? AppColors.muted : AppColors.ink),
+                      TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: gone ? AppColors.muted : AppColors.ink,
+                      ),
                       gone,
                     ),
                   ),
                   if (sub.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(sub,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
+                    Text(
+                      sub,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.muted, fontSize: 13.5),
+                    ),
                   ],
-                  if (guest.hasCar || (guest.notes?.isNotEmpty ?? false)) ...[
+                  if (guest.hasCar || (guest.notes?.isNotEmpty ?? false) || guest.notifyUsers.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (guest.hasCar) _Tag(icon: Icons.directions_car_outlined, label: guest.licensePlate ?? guest.vehicle ?? 'Car'),
-                        if (guest.notes?.isNotEmpty ?? false) const _Tag(icon: Icons.sticky_note_2_outlined, label: 'Note'),
+                        if (guest.hasCar)
+                          _Tag(
+                            icon: Icons.directions_car_outlined,
+                            label: guest.licensePlate ?? guest.vehicle ?? 'Car',
+                          ),
+                        if (guest.notes?.isNotEmpty ?? false)
+                          const _Tag(icon: Icons.sticky_note_2_outlined, label: 'Note'),
+                        if (guest.notifyUsers.isNotEmpty)
+                          _Tag(icon: Icons.notifications_none, label: '+${guest.notifyUsers.length} notified'),
                       ],
                     ),
                   ],
@@ -364,19 +394,22 @@ class _Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: AppColors.panel2,
-          border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(8),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: AppColors.panel2,
+      border: Border.all(color: AppColors.line),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppColors.muted),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSoft),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: AppColors.muted),
-            const SizedBox(width: 4),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSoft)),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }

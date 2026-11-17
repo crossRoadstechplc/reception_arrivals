@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { timeOfDayMinutes } from "@/lib/dates";
 import { FLOOR_ROLE_LABEL, type FloorRole } from "@/lib/types";
-import { GuestForm, type FloorGuest, type HostOption } from "@/components/floor/guest-manager";
+import { GuestForm } from "@/components/floor/guest-form";
+import type { FloorGuest, HostOption } from "@/components/floor/guest-manager";
 import { EmptyState, Modal, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
 import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
@@ -83,6 +84,7 @@ export function GuestCalendar({
   myRole,
   currentUserId,
   hosts,
+  people,
   guests,
 }: {
   view: CalendarView;
@@ -98,6 +100,7 @@ export function GuestCalendar({
   myRole: FloorRole | null;
   currentUserId: string;
   hosts: HostOption[];
+  people: HostOption[];
   guests: FloorGuest[];
 }) {
   const router = useRouter();
@@ -346,9 +349,11 @@ export function GuestCalendar({
           date={editing === "new" ? addDate : editing.visitDate}
           floorId={floorId}
           floorName={floor?.name ?? ""}
+          today={today}
           isAdmin={isAdmin}
           currentUserId={currentUserId}
           hosts={hosts}
+          people={people}
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
@@ -855,7 +860,7 @@ function GuestDetails({
   onEdit: () => void;
 }) {
   // Same rule as the guest list: once reception has checked them in, or the visit is off, it can't be edited.
-  const editable = guest.status === "EXPECTED" || guest.status === "ARRIVED";
+  const editable = guest.canEdit && (guest.status === "EXPECTED" || guest.status === "ARRIVED");
   return (
     <Modal
       title={guest.guestName}
@@ -892,10 +897,19 @@ function GuestDetails({
               {kind === "in" ? (guest.checkedInLabel ?? "Yes") : "Not yet"}
             </dd>
           </div>
-          {showHost ? (
+          {showHost || guest.invited ? (
             <div className="col-span-2">
               <dt className="text-xs font-semibold text-muted">Host</dt>
-              <dd className="mt-0.5 font-medium">{guest.hostName}</dd>
+              <dd className="mt-0.5 font-medium">
+                {guest.hostName}
+                {guest.invited ? <span className="font-normal text-muted"> · you were invited</span> : null}
+              </dd>
+            </div>
+          ) : null}
+          {guest.notifyUsers.length ? (
+            <div className="col-span-2">
+              <dt className="text-xs font-semibold text-muted">Also notifying</dt>
+              <dd className="mt-0.5 font-medium">{guest.notifyUsers.map((u) => u.name).join(", ")}</dd>
             </div>
           ) : null}
         </dl>

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { GuestStatus as PrismaGuestStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { deleteGuestAs, refreshBoards, saveGuestAs, setFloorGuestStatusAs, type SaveGuestInput } from "@/lib/guest-service";
-import { notifyHostOfArrival } from "@/lib/notify";
+import { notifyArrival } from "@/lib/notify";
 import { requireRoles, requireUser } from "@/lib/permissions";
 import { notifyGuestsChanged } from "@/lib/realtime";
 import type { ActionResult, GuestStatus } from "@/lib/types";
@@ -49,12 +49,16 @@ export async function setReceptionStatus(guestId: string, status: GuestStatus): 
       ...(here ? {} : { hostNotifiedAt: null, hostNotifiedVia: null }),
     },
   });
+  if (!here) {
+    // A later arrival should alert the "Also notify" colleagues again too.
+    await db.guestInvitee.updateMany({ where: { guestId: guest.id }, data: { notifiedAt: null, notifiedVia: null } });
+  }
   await refreshBoards();
 
-  if (here && guest.hostUserId && !guest.hostNotifiedAt) {
+  if (here && !guest.hostNotifiedAt) {
     // Send the alert after responding so reception isn't kept waiting.
     after(async () => {
-      await notifyHostOfArrival(guest.id);
+      await notifyArrival(guest.id);
       // Pages are dynamic, so a live refresh is enough to show "host notified".
       await notifyGuestsChanged().catch((error) => console.error("Realtime notify failed", error));
     });

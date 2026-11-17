@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { isISODate, toDateOnly } from "@/lib/dates";
+import { isISODate, officeTodayISO, toDateOnly } from "@/lib/dates";
+import { notifyInviteesAdded } from "@/lib/notify";
 import { canEditGuest, floorRoleOf, type AppUser } from "@/lib/permissions";
 import { notifyGuestsChanged } from "@/lib/realtime";
 import { OTHER_HOST, type ActionResult } from "@/lib/types";
@@ -23,6 +25,8 @@ export type SaveGuestInput = {
   notes?: string;
   licensePlate?: string;
   vehicle?: string;
+  /** "Also notify": colleagues on the floor to tell about the visit. Omit to leave as is. */
+  notifyUserIds?: string[];
 };
 
 export async function refreshBoards() {
@@ -93,6 +97,7 @@ export async function saveGuestAs(user: AppUser, input: SaveGuestInput): Promise
     vehicle: blankToNull(parsed.data.vehicle),
   };
 
+  let guestId: string;
   if (input.id) {
     const existing = await db.guest.findUnique({ where: { id: input.id } });
     if (!existing || !canEditGuest(user, existing)) {
@@ -102,13 +107,50 @@ export async function saveGuestAs(user: AppUser, input: SaveGuestInput): Promise
       return { ok: false, error: "Reception already cleared this guest." };
     }
     await db.guest.update({ where: { id: existing.id }, data });
+    guestId = existing.id;
   } else {
-    await db.guest.create({
-      data: { ...data, createdById: user.id, status: "EXPECTED" },
-    });
+    guestId = (
+      await db.guest.create({
+        data: { ...data, createdById: user.id, status: "EXPECTED" },
+      })
+    ).id;
+  }
+
+  // "Also notify": keep only active people on this floor, never the host.
+  let added: string[] = [];
+  if (parsed.data.notifyUserIds) {
+    const wanted = [...new Set(parsed.data.notifyUserIds)].filter((id) => id !== hostUserId);
+    const allowed = wanted.length
+      ? (
+          await db.floorAssignment.findMany({
+            where: { floorId: floor.id, userId: { in: wanted }, user: { active: true } },
+            select: { userId: true },
+          })
+        ).map((a) => a.userId)
+      : [];
+    const current = (await db.guestInvitee.findMany({ where: { guestId }, select: { userId: true } })).map((i) => i.userId);
+    added = allowed.filter((id) => !current.includes(id));
+    const removed = current.filter((id) => !allowed.includes(id));
+    if (removed.length) await db.guestInvitee.deleteMany({ where: { guestId, userId: { in: removed } } });
+    if (added.length) {
+      await db.guestInvitee.createMany({
+        data: added.map((userId) => ({ guestId: guestId!, userId, invitedById: user.id })),
+        skipDuplicates: true,
+      });
+    }
+  } else if (hostUserId) {
+    // The host can't also be on the notify list.
+    await db.guestInvitee.deleteMany({ where: { guestId, userId: hostUserId } });
   }
 
   await refreshBoards();
+
+  // Tell newly added people about the visit (not for past dates).
+  if (added.length && parsed.data.visitDate >= officeTodayISO()) {
+    const id = guestId;
+    const by = user.name || user.email || "A colleague";
+    after(() => notifyInviteesAdded(id, added, by));
+  }
   return { ok: true };
 }
 

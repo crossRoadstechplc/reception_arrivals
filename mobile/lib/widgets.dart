@@ -10,18 +10,17 @@ class KindStyle {
   final Color text;
 
   static KindStyle of(GuestKind kind) => switch (kind) {
-        GuestKind.expected => const KindStyle(AppColors.expectedSoft, Color(0xFFECD3A3), AppColors.ink),
-        GuestKind.late => const KindStyle(AppColors.signalSoft, Color(0xFFF0C3AE), AppColors.ink),
-        GuestKind.arrived => const KindStyle(AppColors.clearedSoft, Color(0xFFB6DBC4), AppColors.clearedInk),
-        GuestKind.gone => const KindStyle(AppColors.idleSoft, Color(0xFFD9D6D0), AppColors.idle),
-      };
+    GuestKind.expected => const KindStyle(AppColors.expectedSoft, Color(0xFFECD3A3), AppColors.ink),
+    GuestKind.late => const KindStyle(AppColors.signalSoft, Color(0xFFF0C3AE), AppColors.ink),
+    GuestKind.arrived => const KindStyle(AppColors.clearedSoft, Color(0xFFB6DBC4), AppColors.clearedInk),
+    GuestKind.gone => const KindStyle(AppColors.idleSoft, Color(0xFFD9D6D0), AppColors.idle),
+  };
 
   static bool struck(GuestKind kind) => kind == GuestKind.arrived || kind == GuestKind.gone;
 }
 
-TextStyle struckStyle(TextStyle base, bool struck) => struck
-    ? base.copyWith(decoration: TextDecoration.lineThrough, decorationThickness: 1.6)
-    : base;
+TextStyle struckStyle(TextStyle base, bool struck) =>
+    struck ? base.copyWith(decoration: TextDecoration.lineThrough, decorationThickness: 1.6) : base;
 
 class StatusBadge extends StatelessWidget {
   const StatusBadge({super.key, required this.guest, this.late = false});
@@ -41,7 +40,10 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
@@ -54,23 +56,23 @@ class PlateTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.symmetric(horizontal: large ? 10 : 6, vertical: large ? 4 : 1),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppColors.ink.withValues(alpha: 0.7)),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          plate,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1,
-            fontSize: large ? 16 : 12,
-            color: AppColors.ink,
-          ),
-        ),
-      );
+    padding: EdgeInsets.symmetric(horizontal: large ? 10 : 6, vertical: large ? 4 : 1),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.ink.withValues(alpha: 0.7)),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      plate,
+      style: TextStyle(
+        fontFamily: 'monospace',
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1,
+        fontSize: large ? 16 : 12,
+        color: AppColors.ink,
+      ),
+    ),
+  );
 }
 
 class CarLine extends StatelessWidget {
@@ -79,16 +81,16 @@ class CarLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          const Icon(Icons.directions_car_outlined, size: 16, color: AppColors.muted),
-          if (guest.licensePlate?.isNotEmpty ?? false) PlateTag(guest.licensePlate!),
-          if (guest.vehicle?.isNotEmpty ?? false)
-            Text(guest.vehicle!, style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
-        ],
-      );
+    spacing: 6,
+    runSpacing: 4,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      const Icon(Icons.directions_car_outlined, size: 16, color: AppColors.muted),
+      if (guest.licensePlate?.isNotEmpty ?? false) PlateTag(guest.licensePlate!),
+      if (guest.vehicle?.isNotEmpty ?? false)
+        Text(guest.vehicle!, style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+    ],
+  );
 }
 
 class EmptyMessage extends StatelessWidget {
@@ -100,26 +102,34 @@ class EmptyMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(color: AppColors.idleSoft, borderRadius: BorderRadius.circular(16)),
-              child: Icon(icon, color: AppColors.muted),
-            ),
-            const SizedBox(height: 14),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-            if (body != null) ...[
-              const SizedBox(height: 6),
-              Text(body!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted)),
-            ],
-            if (action != null) ...[const SizedBox(height: 16), action!],
-          ],
+    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(color: AppColors.idleSoft, borderRadius: BorderRadius.circular(16)),
+          child: Icon(icon, color: AppColors.muted),
         ),
-      );
+        const SizedBox(height: 14),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+        if (body != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            body!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.muted),
+          ),
+        ],
+        if (action != null) ...[const SizedBox(height: 16), action!],
+      ],
+    ),
+  );
 }
 
 class ErrorBanner extends StatelessWidget {
@@ -129,18 +139,23 @@ class ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-        decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(12)),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500))),
-            if (onRetry != null) TextButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
+    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+    decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(12)),
+    child: Row(
+      children: [
+        const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500),
+          ),
         ),
-      );
+        if (onRetry != null) TextButton(onPressed: onRetry, child: const Text('Retry')),
+      ],
+    ),
+  );
 }
 
 void showMessage(BuildContext context, String message, {String? actionLabel, VoidCallback? onAction}) {
@@ -149,7 +164,9 @@ void showMessage(BuildContext context, String message, {String? actionLabel, Voi
     ..showSnackBar(
       SnackBar(
         content: Text(message),
-        action: actionLabel != null && onAction != null ? SnackBarAction(label: actionLabel, onPressed: onAction) : null,
+        action: actionLabel != null && onAction != null
+            ? SnackBarAction(label: actionLabel, onPressed: onAction)
+            : null,
       ),
     );
 }
@@ -162,15 +179,15 @@ class Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.panel,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        padding: padding,
-        child: child,
-      );
+    decoration: BoxDecoration(
+      color: AppColors.panel,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.line),
+    ),
+    clipBehavior: Clip.antiAlias,
+    padding: padding,
+    child: child,
+  );
 }
 
 /// Small uppercase title above a panel, with an optional count.
@@ -183,24 +200,29 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-        child: Row(
-          children: [
-            Text(title.toUpperCase(),
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: color)),
-            if (count != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                decoration: BoxDecoration(color: AppColors.idleSoft, borderRadius: BorderRadius.circular(999)),
-                child: Text('$count', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
-              ),
-            ],
-            const Spacer(),
-            ?trailing,
-          ],
+    padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+    child: Row(
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: color),
         ),
-      );
+        if (count != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            decoration: BoxDecoration(color: AppColors.idleSoft, borderRadius: BorderRadius.circular(999)),
+            child: Text(
+              '$count',
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.inkSoft),
+            ),
+          ),
+        ],
+        const Spacer(),
+        ?trailing,
+      ],
+    ),
+  );
 }
 
 /// Thin divider between rows inside a [Panel].
@@ -225,6 +247,10 @@ class KindDot extends StatelessWidget {
       GuestKind.arrived => AppColors.cleared,
       GuestKind.gone => AppColors.lineStrong,
     };
-    return Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
   }
 }

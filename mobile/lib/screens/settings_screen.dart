@@ -43,7 +43,10 @@ class SettingsScreen extends StatelessWidget {
                         height: 34,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(8)),
-                        child: Text('${f.number}', style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
+                        child: Text(
+                          '${f.number}',
+                          style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+                        ),
                       ),
                       title: Text(f.name),
                       trailing: Container(
@@ -79,8 +82,10 @@ class SettingsScreen extends StatelessWidget {
                   if (updater.available != null)
                     ListTile(
                       leading: const Icon(Icons.system_update, color: AppColors.signal),
-                      title: Text('Update to ${updater.available!.versionName}',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      title: Text(
+                        'Update to ${updater.available!.versionName}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       subtitle: const Text('A newer version is ready to install.'),
                       onTap: () => updater.showUpdateDialog(context, updater.available!),
                     ),
@@ -139,10 +144,12 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 8),
-        child: Text(text.toUpperCase(),
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1, color: AppColors.muted)),
-      );
+    padding: const EdgeInsets.only(left: 4, bottom: 8),
+    child: Text(
+      text.toUpperCase(),
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1, color: AppColors.muted),
+    ),
+  );
 }
 
 class _AlertsCard extends StatefulWidget {
@@ -169,35 +176,35 @@ class _AlertsCardState extends State<_AlertsCard> {
     final state = alerts.state;
     final (icon, color, title, body) = switch (state) {
       AlertState.on => (
-          Icons.notifications_active,
-          AppColors.cleared,
-          'Alerts are on',
-          'This phone pings you, with the arrival chime, when reception checks in your guest. You also get an email.',
-        ),
+        Icons.notifications_active,
+        AppColors.cleared,
+        'Alerts are on',
+        'This phone pings you, with the arrival chime, when reception checks in your guest. You also get an email.',
+      ),
       AlertState.off => (
-          Icons.notifications_off_outlined,
-          AppColors.muted,
-          'Alerts are off',
-          'Turn them on to get a ping when your guests arrive. You still get an email.',
-        ),
+        Icons.notifications_off_outlined,
+        AppColors.muted,
+        'Alerts are off',
+        'Turn them on to get a ping when your guests arrive. You still get an email.',
+      ),
       AlertState.blocked => (
-          Icons.notifications_off,
-          AppColors.danger,
-          'Notifications are blocked',
-          'Allow notifications for Arrival Desk in the phone’s settings, then come back here.',
-        ),
+        Icons.notifications_off,
+        AppColors.danger,
+        'Notifications are blocked',
+        'Allow notifications for Arrival Desk in the phone’s settings, then come back here.',
+      ),
       AlertState.notSetUp => (
-          Icons.info_outline,
-          AppColors.expected,
-          'Alerts aren’t set up in this app yet',
-          'This build has no Firebase file. You’ll still get an email when your guests arrive.',
-        ),
+        Icons.info_outline,
+        AppColors.expected,
+        'Alerts aren’t set up in this app yet',
+        'This build has no Firebase file. You’ll still get an email when your guests arrive.',
+      ),
       AlertState.serverNotSetUp => (
-          Icons.info_outline,
-          AppColors.expected,
-          'Alerts aren’t set up on the server yet',
-          'Ask your admin to add the Firebase key. You’ll still get an email when your guests arrive.',
-        ),
+        Icons.info_outline,
+        AppColors.expected,
+        'Alerts aren’t set up on the server yet',
+        'Ask your admin to add the Firebase key. You’ll still get an email when your guests arrive.',
+      ),
     };
 
     return Card(
@@ -234,12 +241,12 @@ class _AlertsCardState extends State<_AlertsCard> {
                 onPressed: _busy
                     ? null
                     : () => _do(() async {
-                          try {
-                            return await session.api.sendTestAlert();
-                          } catch (e) {
-                            return e.toString();
-                          }
-                        }),
+                        try {
+                          return await session.api.sendTestAlert();
+                        } catch (e) {
+                          return e.toString();
+                        }
+                      }),
                 icon: const Icon(Icons.send_outlined),
                 label: const Text('Send a test alert'),
               ),
@@ -248,9 +255,9 @@ class _AlertsCardState extends State<_AlertsCard> {
                 onPressed: _busy
                     ? null
                     : () => _do(() async {
-                          await alerts.turnOff();
-                          return 'Alerts turned off on this phone.';
-                        }),
+                        await alerts.turnOff();
+                        return 'Alerts turned off on this phone.';
+                      }),
                 child: const Text('Turn off'),
               ),
             ],

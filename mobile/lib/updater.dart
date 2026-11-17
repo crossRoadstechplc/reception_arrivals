@@ -142,15 +142,16 @@ class Updater extends ChangeNotifier {
                   Text(status ?? '', style: const TextStyle(color: AppColors.muted)),
                 ] else if (status != null) ...[
                   const SizedBox(height: 12),
-                  Text(status!, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500)),
+                  Text(
+                    status!,
+                    style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500),
+                  ),
                 ],
               ],
             ),
             actions: [
-              if (!busy)
-                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Later')),
-              if (!busy)
-                FilledButton(onPressed: () => _install(release), child: const Text('Update now')),
+              if (!busy) TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Later')),
+              if (!busy) FilledButton(onPressed: () => _install(release), child: const Text('Update now')),
             ],
           );
         },
@@ -184,7 +185,8 @@ class Updater extends ChangeNotifier {
                   status = 'Tap “Update” on the next screen to finish.';
                 case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
                   progress = null;
-                  status = 'Allow Arrival Desk to install apps (Settings › Apps › Special app access › '
+                  status =
+                      'Allow Arrival Desk to install apps (Settings › Apps › Special app access › '
                       'Install unknown apps), then tap Update now again.';
                 case OtaStatus.CHECKSUM_ERROR:
                   progress = null;
