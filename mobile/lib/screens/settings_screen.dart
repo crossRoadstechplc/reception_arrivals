@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../notifications.dart';
+import '../session.dart';
 import '../theme.dart';
 import '../updater.dart';
 import '../widgets.dart';
@@ -70,6 +71,11 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if ((session.floor?.isAdmin ?? false) && (session.floor?.roomBookingAvailable ?? false)) ...[
+              const SizedBox(height: 16),
+              const _SectionTitle('Floor settings'),
+              Card(clipBehavior: Clip.antiAlias, child: _RoomBookingTile(key: ValueKey(session.floor!.id))),
+            ],
             const SizedBox(height: 16),
             const _SectionTitle('Notifications'),
             Card(
@@ -147,6 +153,45 @@ String _alertSummary(AlertState state) => switch (state) {
   AlertState.blocked => 'Blocked in phone settings',
   AlertState.notSetUp || AlertState.serverNotSetUp => 'Not set up',
 };
+
+/// Floor admins: offer a meeting room on this floor's guest form, or stop offering it.
+class _RoomBookingTile extends StatefulWidget {
+  const _RoomBookingTile({super.key});
+
+  @override
+  State<_RoomBookingTile> createState() => _RoomBookingTileState();
+}
+
+class _RoomBookingTileState extends State<_RoomBookingTile> {
+  bool _busy = false;
+
+  Future<void> _set(bool enabled) async {
+    final floor = session.floor;
+    if (floor == null) return;
+    setState(() => _busy = true);
+    try {
+      await session.api.setRoomBooking(floor.id, enabled);
+      await session.refreshMe();
+      requestRefresh();
+    } catch (error) {
+      if (mounted) showMessage(context, error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = session.floor?.roomBookingOn ?? false;
+    return SwitchListTile(
+      value: on,
+      onChanged: _busy ? null : _set,
+      secondary: const Icon(Icons.meeting_room_outlined),
+      title: const Text('Meeting room booking', style: TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(on ? 'Hosts can book a room when they add a guest' : 'The guest form doesn’t offer a room'),
+    );
+  }
+}
 
 /// Arrival alert controls, opened from Settings.
 class _NotificationsScreen extends StatelessWidget {

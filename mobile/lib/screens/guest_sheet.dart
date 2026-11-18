@@ -46,18 +46,29 @@ class _GuestSheetState extends State<_GuestSheet> {
 
   Guest get g => widget.guest;
 
-  Future<void> _run(Future<void> Function() action, String done, {VoidCallback? undo}) async {
+  Future<void> _run(Future<BookingOutcome?> Function() action, String done, {VoidCallback? undo}) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await action();
+      final outcome = await action();
       requestRefresh();
       if (!mounted) return;
       Navigator.of(context).pop();
-      if (widget.hostContext.mounted) {
-        showMessage(widget.hostContext, done, actionLabel: undo != null ? 'Undo' : null, onAction: undo);
+      final host = widget.hostContext;
+      if (!host.mounted) return;
+      final note = outcome != null && !outcome.isProblem ? '$done. ${outcome.message}' : done;
+      showMessage(host, note, actionLabel: undo != null ? 'Undo' : null, onAction: undo);
+      if (outcome != null && outcome.isProblem) {
+        await showDialog<void>(
+          context: host,
+          builder: (context) => AlertDialog(
+            title: Text(outcome.title),
+            content: Text(outcome.message),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+          ),
+        );
       }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -96,7 +107,12 @@ class _GuestSheetState extends State<_GuestSheet> {
         ],
       ),
     );
-    if (ok == true) _run(() => session.api.deleteGuest(g.id), '${g.guestName} deleted');
+    if (ok == true) {
+      _run(() async {
+        await session.api.deleteGuest(g.id);
+        return null;
+      }, '${g.guestName} deleted');
+    }
   }
 
   Future<void> _edit() async {
@@ -218,6 +234,19 @@ class _GuestSheetState extends State<_GuestSheet> {
                 icon: Icons.notifications_none,
                 title: g.notifyUsers.map((u) => u.id == session.user?.id ? 'You' : u.name).join(', '),
                 sub: 'Also notified on arrival',
+              ),
+            if (!g.notComing && (g.booking?.booked ?? false))
+              _DetailRow(
+                icon: Icons.meeting_room_outlined,
+                title: g.booking!.roomName ?? 'Meeting room',
+                sub: g.booking!.timeLabel,
+              ),
+            if (!g.notComing && g.booking?.problem != null)
+              _DetailRow(
+                icon: Icons.error_outline,
+                color: AppColors.danger,
+                title: g.booking!.booked ? 'Room not moved' : 'Room not booked',
+                sub: g.booking!.problem,
               ),
             if (g.hasCar)
               _DetailRow(

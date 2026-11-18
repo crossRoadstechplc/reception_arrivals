@@ -85,9 +85,26 @@ class Api {
   Future<GuestRange> guests({required String floorId, required String from, required String to}) async =>
       GuestRange.fromJson(await _send('GET', '/guests', query: {'floor': floorId, 'from': from, 'to': to}));
 
-  Future<void> saveGuest(GuestInput input) => _send('POST', '/guests', body: input.toJson());
+  /// Saves the guest and reports what happened to any meeting room.
+  Future<BookingOutcome?> saveGuest(GuestInput input) async =>
+      BookingOutcome.fromJson((await _send('POST', '/guests', body: input.toJson()))['booking']);
 
-  Future<void> setStatus(String guestId, String status) => _send('PATCH', '/guests/$guestId', body: {'status': status});
+  Future<BookingOutcome?> setStatus(String guestId, String status) async =>
+      BookingOutcome.fromJson((await _send('PATCH', '/guests/$guestId', body: {'status': status}))['booking']);
+
+  /// Meeting rooms and the times already taken on a day.
+  Future<List<RoomOption>> rooms({required String floorId, required String date, String? guestId}) async {
+    final data = await _send(
+      'GET',
+      '/rooms',
+      query: {'floor': floorId, 'date': date, 'guest': ?guestId},
+    );
+    return (data['rooms'] as List).map((e) => RoomOption.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Floor admins: offer meeting room booking on the guest form, or stop offering it.
+  Future<void> setRoomBooking(String floorId, bool enabled) =>
+      _send('PATCH', '/floors/$floorId/room-booking', body: {'enabled': enabled});
 
   Future<void> deleteGuest(String guestId) => _send('DELETE', '/guests/$guestId');
 

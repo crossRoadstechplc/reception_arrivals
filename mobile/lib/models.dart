@@ -17,8 +17,21 @@ class AppUser {
 }
 
 class Floor {
-  Floor({required this.id, required this.name, required this.number, required this.role});
+  Floor({
+    required this.id,
+    required this.name,
+    required this.number,
+    required this.role,
+    this.roomBookingAvailable = false,
+    this.roomBookingOn = false,
+  });
   final String id;
+
+  /// The floor is connected to a booking system, so its admin can switch booking on.
+  final bool roomBookingAvailable;
+
+  /// Booking is switched on: the guest form offers a meeting room.
+  final bool roomBookingOn;
 
   /// "6th Floor · SPX" (floor name and the company on it).
   final String name;
@@ -44,7 +57,83 @@ class Floor {
     name: json['name'] as String,
     number: (json['number'] as num).toInt(),
     role: json['role'] as String,
+    roomBookingAvailable: json['roomBookingAvailable'] as bool? ?? false,
+    roomBookingOn: json['roomBookingOn'] as bool? ?? false,
   );
+}
+
+/// The meeting room for a visit, or why it couldn't be booked.
+class GuestBooking {
+  GuestBooking({required this.booked, this.roomId, this.roomName, this.minutes, this.timeLabel, this.problem});
+  final bool booked;
+  final String? roomId;
+  final String? roomName;
+  final int? minutes;
+  final String? timeLabel;
+  final String? problem;
+
+  factory GuestBooking.fromJson(Map<String, dynamic> json) => GuestBooking(
+    booked: json['booked'] as bool? ?? false,
+    roomId: json['roomId'] as String?,
+    roomName: json['roomName'] as String?,
+    minutes: (json['minutes'] as num?)?.toInt(),
+    timeLabel: json['timeLabel'] as String?,
+    problem: json['problem'] as String?,
+  );
+}
+
+/// A time already taken in a meeting room.
+class BusySlot {
+  BusySlot({required this.from, required this.to, required this.label});
+  final String from;
+  final String to;
+  final String label;
+
+  static int _minutes(String hhmm) {
+    final parts = hhmm.split(':');
+    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+  }
+
+  int get fromMinutes => _minutes(from);
+  int get toMinutes => _minutes(to);
+
+  factory BusySlot.fromJson(Map<String, dynamic> json) =>
+      BusySlot(from: json['from'] as String, to: json['to'] as String, label: json['label'] as String);
+}
+
+/// A meeting room and the times already taken on one day.
+class RoomOption {
+  RoomOption({required this.id, required this.name, this.location, this.capacity, this.busy = const []});
+  final String id;
+  final String name;
+  final String? location;
+  final int? capacity;
+  final List<BusySlot> busy;
+
+  factory RoomOption.fromJson(Map<String, dynamic> json) => RoomOption(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    location: json['location'] as String?,
+    capacity: (json['capacity'] as num?)?.toInt(),
+    busy: ((json['busy'] as List?) ?? const []).map((e) => BusySlot.fromJson(e as Map<String, dynamic>)).toList(),
+  );
+}
+
+/// What happened to the meeting room when a guest was saved.
+class BookingOutcome {
+  BookingOutcome({required this.kind, required this.message});
+
+  /// booked, taken, failed or cancelled.
+  final String kind;
+  final String message;
+
+  bool get isProblem => kind == 'taken' || kind == 'failed';
+  String get title => kind == 'taken' ? 'Room taken' : 'Room not booked';
+
+  static BookingOutcome? fromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    return BookingOutcome(kind: json['kind'] as String, message: json['message'] as String);
+  }
 }
 
 class Host {
@@ -75,7 +164,11 @@ class Guest {
     this.vehicle,
     this.notifyUsers = const [],
     this.invited = false,
+    this.booking,
   });
+
+  /// The meeting room for this visit, if one was asked for.
+  final GuestBooking? booking;
 
   final String id;
   final String visitDate;
@@ -158,6 +251,7 @@ class Guest {
         .map((e) => Host.fromJson(e as Map<String, dynamic>))
         .toList(),
     invited: json['invited'] as bool? ?? false,
+    booking: json['booking'] == null ? null : GuestBooking.fromJson(json['booking'] as Map<String, dynamic>),
   );
 }
 
@@ -240,7 +334,17 @@ class GuestInput {
     this.licensePlate = '',
     this.vehicle = '',
     this.notifyUserIds = const [],
+    this.sendBooking = false,
+    this.roomId,
+    this.roomMinutes = 60,
   });
+
+  /// Include the meeting room choice. Left out, any booking just follows the visit.
+  final bool sendBooking;
+
+  /// The room to book, or null for no room.
+  final String? roomId;
+  final int roomMinutes;
 
   final String? id;
   final String floorId;
@@ -268,6 +372,7 @@ class GuestInput {
     'licensePlate': licensePlate,
     'vehicle': vehicle,
     'notifyUserIds': notifyUserIds,
+    if (sendBooking) 'booking': roomId == null ? null : {'roomId': roomId, 'minutes': roomMinutes},
   };
 }
 

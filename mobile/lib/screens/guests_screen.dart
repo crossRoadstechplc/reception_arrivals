@@ -333,6 +333,14 @@ class GuestRow extends StatelessWidget {
       if (guest.invited) 'Invited by ${guest.hostName}',
     ].join(' · ');
 
+    final booking = guest.notComing ? null : guest.booking;
+    final roomTag = booking == null
+        ? null
+        : _Tag(
+            icon: booking.booked ? Icons.meeting_room_outlined : Icons.error_outline,
+            label: booking.booked ? (booking.roomName ?? 'Room') : 'Room not booked',
+          );
+
     final timeNote = switch (kind) {
       GuestKind.late => const Text(
         'LATE',
@@ -413,13 +421,17 @@ class GuestRow extends StatelessWidget {
                       style: const TextStyle(color: AppColors.muted, fontSize: 13.5),
                     ),
                   ],
-                  if (guest.hasCar || (guest.notes?.isNotEmpty ?? false) || guest.notifyUsers.isNotEmpty) ...[
+                  if (guest.hasCar ||
+                      (guest.notes?.isNotEmpty ?? false) ||
+                      guest.notifyUsers.isNotEmpty ||
+                      roomTag != null) ...[
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        ?roomTag,
                         if (guest.hasCar)
                           _Tag(
                             icon: Icons.directions_car_outlined,

@@ -25,6 +25,7 @@ Future<String?> openGuestForm(BuildContext context, {required String date, Guest
         hosts: data?.hosts ?? const [],
         people: data?.people ?? const [],
         recentCompanies: companies,
+        roomBooking: data?.floor.roomBookingOn ?? session.floor?.roomBookingOn ?? false,
       ),
     ),
   );
@@ -42,7 +43,11 @@ class GuestFormScreen extends StatefulWidget {
     required this.people,
     this.recentCompanies = const [],
     this.guest,
+    this.roomBooking = false,
   });
+
+  /// The floor offers meeting room booking.
+  final bool roomBooking;
   final String date;
   final Guest? guest;
   final List<Host> hosts;
@@ -74,6 +79,24 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
   String? _savedDate;
   String? _error;
 
+  bool _bookRoom = false;
+  String? _roomId;
+  int _roomMinutes = 60;
+  List<RoomOption> _rooms = [];
+  String? _roomsDate;
+  String? _roomsError;
+
+  static const _roomLengths = [30, 60, 120];
+
+  bool get _wantsRoom => widget.roomBooking && _bookRoom;
+  bool get _roomsLoading => _wantsRoom && _roomsDate != _date;
+  RoomOption? get _selectedRoom {
+    final rooms = _roomsDate == _date ? _rooms : const <RoomOption>[];
+    return rooms.where((r) => r.id == _roomId).firstOrNull ?? rooms.firstOrNull;
+  }
+
+  String? get _chosenRoomId => _selectedRoom?.id ?? _roomId;
+
   Guest? get g => widget.guest;
   bool get _isNew => g == null;
   bool get _isAdmin => session.floor?.isAdmin ?? false;
@@ -98,6 +121,10 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
     _host = g == null ? _me : (g!.hostUserId ?? otherHost);
     if (g != null && g!.hostUserId == null) _hostName.text = g!.hostName;
     _notify = g?.notifyUsers.map((u) => u.id).toList() ?? [];
+    _bookRoom = widget.roomBooking && g?.booking != null;
+    _roomId = g?.booking?.roomId;
+    _roomMinutes = g?.booking?.minutes ?? 60;
+    if (_bookRoom) _loadRooms();
     for (final c in [_name, _company, _hostName, _plate, _vehicle, _notes]) {
       c.addListener(() => setState(() {}));
     }
@@ -119,8 +146,58 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
     return id == _me ? session.user!.displayName : 'Someone';
   }
 
+  /// The rooms and the times already taken on the chosen day.
+  Future<void> _loadRooms() async {
+    final date = _date;
+    try {
+      final rooms = await session.api.rooms(floorId: session.floor!.id, date: date, guestId: g?.id);
+      if (!mounted || date != _date) return;
+      setState(() {
+        _rooms = rooms;
+        _roomsDate = date;
+        _roomsError = null;
+      });
+    } catch (error) {
+      if (!mounted || date != _date) return;
+      setState(() {
+        _rooms = [];
+        _roomsDate = date;
+        _roomsError = error.toString();
+      });
+    }
+  }
+
+  void _setDate(String date) {
+    setState(() => _date = date);
+    if (_wantsRoom) _loadRooms();
+  }
+
+  /// A room problem needs a clear answer, so it waits for the person to read it.
+  Future<void> _showRoomProblem(BookingOutcome outcome) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(outcome.title),
+      content: Text(outcome.message),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+    ),
+  );
+
+  static String _lengthLabel(int minutes) {
+    if (minutes % 60 != 0) return '$minutes min';
+    return minutes == 60 ? '1 hour' : '${minutes ~/ 60} hours';
+  }
+
   String? _problem(_Step step) {
     if (step == _Step.guest && _name.text.trim().length < 2) return 'Enter the guest’s name.';
+    if (step == _Step.when && _wantsRoom && _time == null) return 'Choose an expected time so the room can be booked.';
+    if (step == _Step.when && _wantsRoom && _chosenRoomId == null) {
+      return _roomsLoading
+          ? 'Meeting rooms are still loading.'
+          : '${_roomsError ?? 'No meeting rooms are available.'} Turn off room booking to continue.';
+    }
+    if (step == _Step.host && _wantsRoom && _isAdmin && _host == otherHost) {
+      return 'A room can only be booked for a host with an account. Choose someone from the list, or turn off room booking.';
+    }
     if (step == _Step.host && _isAdmin && _host == otherHost && _hostName.text.trim().length < 2) {
       return 'Enter the host’s name.';
     }
@@ -169,7 +246,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
       lastDate: DateTime(2100),
       helpText: 'Visit date',
     );
-    if (picked != null) setState(() => _date = isoFromDate(picked));
+    if (picked != null) _setDate(isoFromDate(picked));
   }
 
   Future<void> _pickPeople() async {
@@ -204,7 +281,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
     });
     final name = _name.text.trim();
     try {
-      await session.api.saveGuest(
+      final outcome = await session.api.saveGuest(
         GuestInput(
           id: g?.id,
           floorId: session.floor!.id,
@@ -218,11 +295,21 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
           licensePlate: _byCar ? _plate.text : '',
           vehicle: _byCar ? _vehicle.text : '',
           notifyUserIds: _notifyList,
+          // When the floor doesn't offer booking, any existing booking just follows the visit.
+          sendBooking: widget.roomBooking,
+          roomId: _wantsRoom ? _chosenRoomId : null,
+          roomMinutes: _roomMinutes,
         ),
       );
       _savedDate = _date;
       requestRefresh(); // every tab shows the guest straight away
       if (!mounted) return;
+      if (outcome != null && outcome.isProblem) {
+        await _showRoomProblem(outcome);
+        if (!mounted) return;
+      } else if (outcome != null) {
+        showMessage(context, outcome.message);
+      }
       if (another) {
         // Saved: open a new, empty form for the next guest.
         setState(() {
@@ -236,6 +323,9 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
           _date = widget.date;
           _host = _me;
           _notify = [];
+          _bookRoom = false;
+          _roomId = null;
+          _roomMinutes = 60;
           _step = _Step.guest;
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -553,7 +643,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
                   ),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
-                    onTap: () => setState(() => _date = days[i]),
+                    onTap: () => _setDate(days[i]),
                     child: SizedBox(
                       height: 76,
                       child: Column(
@@ -642,7 +732,107 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
               _chip(clockLabel(t.hour * 60 + t.minute), _time == t, () => setState(() => _time = t)),
           ],
         ),
+        if (widget.roomBooking) ...[const SizedBox(height: 18), _roomSection()],
       ],
+    );
+  }
+
+  /// "Book a meeting room": the room, how long, and what's already taken that day.
+  Widget _roomSection() {
+    final room = _selectedRoom;
+    final rooms = _roomsDate == _date ? _rooms : const <RoomOption>[];
+    final lengths = {..._roomLengths, _roomMinutes}.toList()..sort();
+    final start = _time == null ? null : _time!.hour * 60 + _time!.minute;
+    final clash = start == null
+        ? null
+        : room?.busy.where((s) => s.fromMinutes < start + _roomMinutes && s.toMinutes > start).firstOrNull;
+    final details = [
+      if (room?.location?.isNotEmpty ?? false) room!.location!,
+      if (room?.capacity != null) 'Seats ${room!.capacity}',
+    ].join(' · ');
+    const hint = TextStyle(fontSize: 13.5, color: AppColors.muted);
+    return Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            value: _bookRoom,
+            onChanged: (v) {
+              setState(() => _bookRoom = v);
+              if (v) _loadRooms();
+            },
+            secondary: const Icon(Icons.meeting_room_outlined),
+            title: const Text('Book a meeting room', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Starts at the expected time, under the host’s name'),
+          ),
+          if (_bookRoom)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_roomsLoading) const Text('Checking the rooms…', style: hint),
+                  if (_roomsError != null && !_roomsLoading)
+                    Text(
+                      _roomsError!,
+                      style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w500),
+                    ),
+                  if (rooms.length > 1) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final r in rooms) _chip(r.name, r.id == room?.id, () => setState(() => _roomId = r.id)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (room != null) ...[
+                    Text(room.name, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                    if (details.isNotEmpty) Text(details, style: hint),
+                    const SizedBox(height: 12),
+                  ],
+                  const Text(
+                    'How long?',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final m in lengths)
+                        _chip(_lengthLabel(m), m == _roomMinutes, () => setState(() => _roomMinutes = m)),
+                    ],
+                  ),
+                  if (room != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      room.busy.isEmpty
+                          ? 'Free all day.'
+                          : 'Taken this day: ${room.busy.map((s) => s.label).join(', ')}',
+                      style: hint,
+                    ),
+                  ],
+                  if (_time == null) ...[
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Choose an expected time to book the room.',
+                      style: TextStyle(color: AppColors.expected, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                  if (clash != null && room != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      '${room.name} is taken from ${clash.label}. Choose another time or a shorter meeting.',
+                      style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -864,6 +1054,11 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
         card(Icons.schedule, 'WHEN', [
           Text(_date == _today ? 'Today, ${longDate(_date)}' : longDate(_date), style: main),
           Text(_time == null ? 'Any time' : clockLabel(_time!.hour * 60 + _time!.minute), style: sub),
+          if (_wantsRoom)
+            Text(
+              '${_selectedRoom?.name ?? g?.booking?.roomName ?? 'Meeting room'} · ${_lengthLabel(_roomMinutes)}',
+              style: sub,
+            ),
         ], _Step.when),
         card(Icons.notifications_none, 'HOST AND ALERTS', [
           Text(hostWho, style: main),
