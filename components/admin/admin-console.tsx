@@ -18,7 +18,7 @@ import {
   type Role,
 } from "@/lib/types";
 import { Alert, ConfirmDialog, EmptyState, Modal, StatTile, Toast, initials, useToast } from "@/components/ui";
-import { BuildingIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, UserIcon } from "@/components/icons";
+import { BuildingIcon, CopyIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, UserIcon } from "@/components/icons";
 
 type FloorRow = {
   id: string;
@@ -31,6 +31,8 @@ type FloorRow = {
 };
 type UserRow = {
   id: string;
+  /** The ID other systems use for this person. */
+  externalId: string;
   name: string | null;
   email: string | null;
   role: Role;
@@ -228,8 +230,17 @@ function PeopleTab({
   const visible = users.filter((person) => {
     if (kind !== "all" && kindOf(person) !== kind) return false;
     if (!needle) return true;
-    return `${person.name ?? ""} ${person.email ?? ""}`.toLowerCase().includes(needle);
+    return `${person.name ?? ""} ${person.email ?? ""} ${person.externalId}`.toLowerCase().includes(needle);
   });
+
+  async function copyUserId(person: UserRow) {
+    try {
+      await navigator.clipboard.writeText(person.externalId);
+      onNotice("User ID copied");
+    } catch {
+      onNotice("Couldn't copy the User ID", "error");
+    }
+  }
 
   function toggleActive(person: UserRow) {
     setPendingId(person.id);
@@ -279,7 +290,7 @@ function PeopleTab({
           <input
             type="search"
             className="field pl-9"
-            placeholder="Search name or email"
+            placeholder="Search name, email or User ID"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -350,6 +361,19 @@ function PeopleTab({
                         )
                       ) : null}
                     </p>
+                    <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted">
+                      <span className="shrink-0 font-semibold">ID</span>
+                      <span className="truncate font-mono">{person.externalId}</span>
+                      <button
+                        type="button"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-panel-2 hover:text-ink"
+                        aria-label={`Copy User ID for ${person.name || person.email}`}
+                        title="Copy User ID"
+                        onClick={() => copyUserId(person)}
+                      >
+                        <CopyIcon className="size-3.5" />
+                      </button>
+                    </p>
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-1.5 pl-[3.25rem] sm:pl-0">
@@ -416,6 +440,7 @@ function PersonModal({
   );
   const [setupMode, setSetupMode] = useState<"invite" | "password">("invite");
   const [active, setActive] = useState(person?.active ?? true);
+  const [externalId, setExternalId] = useState(person?.externalId ?? "");
   const [password, setPassword] = useState("");
   const [revealKey, setRevealKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -454,6 +479,7 @@ function PersonModal({
             password: setupMode === "password" ? password : "",
             role,
             floors: selectedFloors,
+            externalId,
           })
         : await updateUser({
             userId: person.id,
@@ -462,6 +488,7 @@ function PersonModal({
             active: locked ? true : active,
             floors: selectedFloors,
             password,
+            externalId,
           });
       if (!result.ok) {
         setError(result.error);
@@ -504,6 +531,36 @@ function PersonModal({
               <input className="field" value={person.email ?? ""} disabled readOnly />
             )}
           </label>
+        </div>
+
+        <div>
+          <label htmlFor="person-user-id" className="label">
+            User ID {isNew ? <span className="font-normal text-muted">(optional)</span> : null}
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="person-user-id"
+              name="externalId"
+              className="field min-w-0 flex-1 font-mono text-sm"
+              value={externalId}
+              onChange={(event) => setExternalId(event.target.value)}
+              maxLength={100}
+              required={!isNew}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={isNew ? "Leave blank to create one automatically" : undefined}
+            />
+            <button type="button" className="btn btn-secondary shrink-0" onClick={() => setExternalId(crypto.randomUUID())}>
+              New UUID
+            </button>
+          </div>
+          {!isNew && externalId.trim() !== person.externalId ? (
+            <p className="mt-1.5 text-sm font-medium text-expected">
+              Other systems using the current ID will stop matching this person.
+            </p>
+          ) : (
+            <p className="hint mt-1.5">The ID other systems use for this person.</p>
+          )}
         </div>
 
         <fieldset>
@@ -586,12 +643,12 @@ function PersonModal({
 
         {isNew ? (
           <fieldset>
-            <legend className="label">How do they get a password?</legend>
+            <legend className="label">How will they sign in?</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {(
                 [
-                  ["invite", "Email an invite", "They get a link to set their own password."],
-                  ["password", "Set it myself", "You share the password with them."],
+                  ["invite", "Email an invite", "They sign in with a code sent to their email."],
+                  ["password", "Set a password", "You share the password with them."],
                 ] as const
               ).map(([value, title, body]) => (
                 <label
@@ -614,7 +671,7 @@ function PersonModal({
         {!isNew && person.pending ? (
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-expected/25 bg-expected-soft px-3 py-2.5">
             <span className="flex-1 text-sm text-expected">
-              <span className="font-semibold">Invite pending.</span> They haven&apos;t set a password yet.
+              <span className="font-semibold">Invite pending.</span> They haven&apos;t signed in yet.
             </span>
             <button type="button" className="btn btn-secondary btn-sm" disabled={resending} onClick={resend}>
               {resending ? "Sending…" : "Resend invite"}

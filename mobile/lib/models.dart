@@ -193,17 +193,35 @@ class GuestRange {
 }
 
 class Me {
-  Me({required this.user, required this.floors, required this.today, required this.alertsAvailable});
+  Me({
+    required this.user,
+    required this.floors,
+    required this.today,
+    required this.alertsAvailable,
+    this.token,
+    this.realtimeUrl,
+    this.realtimeKey,
+  });
   final AppUser user;
   final List<Floor> floors;
   final String today;
   final bool alertsAvailable;
+
+  /// A renewed sign-in token, so people who use the app stay signed in.
+  final String? token;
+
+  /// Where to connect for live updates, when the server offers them.
+  final String? realtimeUrl;
+  final String? realtimeKey;
 
   factory Me.fromJson(Map<String, dynamic> json) => Me(
     user: AppUser.fromJson(json['user'] as Map<String, dynamic>),
     floors: (json['floors'] as List).map((e) => Floor.fromJson(e as Map<String, dynamic>)).toList(),
     today: json['today'] as String,
     alertsAvailable: json['alertsAvailable'] as bool? ?? false,
+    token: json['token'] as String?,
+    realtimeUrl: (json['realtime'] as Map<String, dynamic>?)?['url'] as String?,
+    realtimeKey: (json['realtime'] as Map<String, dynamic>?)?['anonKey'] as String?,
   );
 }
 

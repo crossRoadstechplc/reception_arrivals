@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../config.dart';
 import '../main.dart';
 import '../notifications.dart';
 import '../theme.dart';
@@ -72,8 +71,18 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const _SectionTitle('Arrival alerts'),
-            const _AlertsCard(),
+            const _SectionTitle('Notifications'),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: const Icon(Icons.notifications_none),
+                title: const Text('Arrival alerts', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(_alertSummary(alerts.state)),
+                trailing: const Icon(Icons.chevron_right, color: AppColors.lineStrong),
+                onTap: () =>
+                    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const _NotificationsScreen())),
+              ),
+            ),
             const SizedBox(height: 16),
             const _SectionTitle('App'),
             Card(
@@ -119,12 +128,6 @@ class SettingsScreen extends StatelessWidget {
               icon: const Icon(Icons.logout),
               label: const Text('Sign out'),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Arrival Desk · ${Uri.parse(apiBaseUrl).host}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
           ],
         );
       },
@@ -135,6 +138,29 @@ class SettingsScreen extends StatelessWidget {
     final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return '?';
     return (parts.first[0] + (parts.length > 1 ? parts.last[0] : '')).toUpperCase();
+  }
+}
+
+String _alertSummary(AlertState state) => switch (state) {
+  AlertState.on => 'On',
+  AlertState.off => 'Off',
+  AlertState.blocked => 'Blocked in phone settings',
+  AlertState.notSetUp || AlertState.serverNotSetUp => 'Not set up',
+};
+
+/// Arrival alert controls, opened from Settings.
+class _NotificationsScreen extends StatelessWidget {
+  const _NotificationsScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notifications')),
+      body: ListenableBuilder(
+        listenable: alerts,
+        builder: (context, _) => ListView(padding: const EdgeInsets.all(16), children: const [_AlertsCard()]),
+      ),
+    );
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'live_updates.dart';
 import 'notifications.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -41,6 +42,7 @@ class ArrivalDeskApp extends StatefulWidget {
 
 class _ArrivalDeskAppState extends State<ArrivalDeskApp> with WidgetsBindingObserver {
   bool _introDone = false;
+  DateTime? _leftAt;
   bool _started = false;
 
   bool get _showSplash => !_introDone || !_started;
@@ -71,12 +73,24 @@ class _ArrivalDeskAppState extends State<ArrivalDeskApp> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _leftAt ??= DateTime.now();
+      liveUpdates.stop();
+    }
+    if (state == AppLifecycleState.resumed) {
+      final left = _leftAt;
+      _leftAt = null;
+      if (session.signedIn) liveUpdates.start();
+      // Away for a minute or more: open on today again.
+      if (left != null && DateTime.now().difference(left).abs() >= const Duration(minutes: 1)) appReturned.value++;
+    }
     // Back in the app: reload guests and re-check alert permission (it may have changed in Settings).
     if (state == AppLifecycleState.resumed && !_showSplash) {
       _checkForUpdate();
       if (session.signedIn) {
         requestRefresh();
         alerts.recheck();
+        session.renewIfDue();
       }
     }
   }
@@ -88,6 +102,12 @@ class _ArrivalDeskAppState extends State<ArrivalDeskApp> with WidgetsBindingObse
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      // Notes any touch, so a screen only returns to today when nobody is using it.
+      builder: (context, child) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => lastTouch = DateTime.now(),
+        child: child,
+      ),
       home: AnimatedSwitcher(
         duration: const Duration(milliseconds: 450),
         switchInCurve: Curves.easeOut,

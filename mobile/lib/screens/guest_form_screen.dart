@@ -3,19 +3,20 @@ import 'package:flutter/material.dart';
 import '../dates.dart';
 import '../main.dart';
 import '../models.dart';
+import '../session.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// Opens the add/edit form. Returns true when something was saved.
+/// Opens the add/edit form. Returns the date of the last guest saved, or null if nothing was.
 /// [data] is the screen's loaded guests: it supplies hosts, the floor's people
 /// (for "Also notify") and recent companies.
-Future<bool> openGuestForm(BuildContext context, {required String date, Guest? guest, GuestRange? data}) async {
+Future<String?> openGuestForm(BuildContext context, {required String date, Guest? guest, GuestRange? data}) async {
   final companies = <String>[];
   for (final g in data?.guests ?? const <Guest>[]) {
     final c = g.company?.trim();
     if (c != null && c.isNotEmpty && !companies.contains(c)) companies.add(c);
   }
-  final saved = await Navigator.of(context).push<bool>(
+  return Navigator.of(context).push<String>(
     MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => GuestFormScreen(
@@ -27,7 +28,6 @@ Future<bool> openGuestForm(BuildContext context, {required String date, Guest? g
       ),
     ),
   );
-  return saved ?? false;
 }
 
 enum _Step { guest, when, host, extras, review }
@@ -71,6 +71,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
   bool _busy = false;
   int _added = 0;
   String? _lastSaved;
+  String? _savedDate;
   String? _error;
 
   Guest? get g => widget.guest;
@@ -219,6 +220,8 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
           notifyUserIds: _notifyList,
         ),
       );
+      _savedDate = _date;
+      requestRefresh(); // every tab shows the guest straight away
       if (!mounted) return;
       if (another) {
         // Saved: open a new, empty form for the next guest.
@@ -239,7 +242,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
           if (mounted) _nameFocus.requestFocus();
         });
       } else {
-        Navigator.of(context).pop(true);
+        Navigator.of(context).pop(_date);
       }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -277,7 +280,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
       canPop: false,
       // Android's back gesture also reports guests already saved, so the list refreshes.
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !_busy) Navigator.of(context).pop(_added > 0);
+        if (!didPop && !_busy) Navigator.of(context).pop(_savedDate);
       },
       child: Scaffold(
         backgroundColor: AppColors.paper,
@@ -285,7 +288,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
           leading: IconButton(
             tooltip: 'Close',
             icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(_added > 0),
+            onPressed: () => Navigator.of(context).pop(_savedDate),
           ),
           title: Text(_isNew ? 'Add guest' : 'Edit guest'),
           actions: [

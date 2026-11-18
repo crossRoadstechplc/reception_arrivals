@@ -355,6 +355,9 @@ export function GuestManager({
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
+          onShowDate={(saved) => {
+            if (saved !== date) visit({ date: saved });
+          }}
         />
       ) : null}
 

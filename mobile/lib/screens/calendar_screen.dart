@@ -110,6 +110,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   void dispose() {
+    _keeper.dispose();
     _loader.dispose();
     super.dispose();
   }
@@ -179,12 +180,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   GuestKind _kind(Guest g) => g.kind(today: _today, nowMinutes: _loader.nowMinutes);
 
-  void _open(Guest g) => showGuestSheet(context, guest: g, loader: _loader);
+  void _open(Guest g) => showGuestSheet(context, guest: g, loader: _loader, onShowDate: _showDate);
+
+  /// Moves to a saved guest's date when it isn't on screen.
+  void _showDate(String date) {
+    final (from, to) = _range();
+    if (date.compareTo(from) < 0 || date.compareTo(to) > 0) _go(date);
+  }
 
   Future<void> _add([String? date]) async {
     final day = date ?? _anchor;
     final saved = await openGuestForm(context, date: day.compareTo(_today) < 0 ? _today : day, data: _loader.data);
-    if (saved) _loader.load(quiet: true);
+    if (saved != null && mounted) _showDate(saved);
   }
 
   String get _title {

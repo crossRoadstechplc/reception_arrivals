@@ -4,12 +4,12 @@ import { NextResponse } from "next/server";
 import { loadAppUser, type AppUser } from "@/lib/permissions";
 
 /**
- * Sign-in for the Android app. The app sends email + password once and gets a
- * long-lived bearer token. The token stops working when the person is
- * deactivated, loses floor access, or changes their password.
+ * Sign-in for the Android app. After an email code or password, the app holds a
+ * bearer token that is renewed whenever the app is used. The token stops working
+ * when the person is deactivated, loses floor access, or changes their password.
  */
 
-const TOKEN_DAYS = 90;
+const TOKEN_DAYS = 180;
 
 function secretKey() {
   const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
@@ -43,16 +43,18 @@ export async function mobileUser(request: Request): Promise<AppUser | null> {
   const header = request.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) return null;
+  let payload;
   try {
-    const { payload } = await jwtVerify(token, secretKey(), { audience: "arrival-desk-mobile" });
-    if (!payload.sub) return null;
-    const user = await loadAppUser(payload.sub);
-    if (!user || !canUseApp(user)) return null;
-    if (payload.pv !== passwordVersion(user.passwordHash)) return null;
-    return user;
+    ({ payload } = await jwtVerify(token, secretKey(), { audience: "arrival-desk-mobile" }));
   } catch {
-    return null;
+    return null; // expired or not one of ours
   }
+  if (!payload.sub) return null;
+  // Not caught here: a database hiccup is not a reason to sign someone out.
+  const user = await loadAppUser(payload.sub);
+  if (!user || !canUseApp(user)) return null;
+  if (payload.pv !== passwordVersion(user.passwordHash)) return null;
+  return user;
 }
 
 export function unauthorized() {
@@ -61,7 +63,13 @@ export function unauthorized() {
 
 /** Runs a handler with the app user, or answers 401. */
 export async function withMobileUser(request: Request, handler: (user: AppUser) => Promise<Response>) {
-  const user = await mobileUser(request);
+  let user: AppUser | null;
+  try {
+    user = await mobileUser(request);
+  } catch (error) {
+    console.error("App sign-in check could not reach the database", error);
+    return NextResponse.json({ error: "Arrival Desk is busy. Try again in a moment." }, { status: 503 });
+  }
   if (!user) return unauthorized();
   return handler(user);
 }

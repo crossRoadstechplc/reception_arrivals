@@ -117,7 +117,7 @@ export function TeamManager({
         <EmptyState
           icon={<UserIcon className="size-6" />}
           title="No floor staff yet"
-          body="Add the people on this floor who receive visitors. They'll get an email to set their password."
+          body="Add the people on this floor who receive visitors. They'll get an email inviting them to sign in."
           action={
             <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
               <PlusIcon className="size-4" />
@@ -288,7 +288,7 @@ function AddMemberModal({
   return (
     <Modal
       title={`Add floor staff to ${floor.name}`}
-      description="New people get an email to set their password. People who already have an account just join this floor."
+      description="New people get an email inviting them to sign in. People who already have an account just join this floor."
       onClose={onClose}
       footer={
         <>

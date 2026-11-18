@@ -359,6 +359,9 @@ export function GuestCalendar({
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
+          onShowDate={(saved) => {
+            if (!days.some((day) => day.iso === saved)) visit({ date: saved });
+          }}
         />
       ) : null}
 

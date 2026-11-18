@@ -36,6 +36,14 @@ const floorMembership = z.object({
   role: z.enum(["ADMIN", "MEMBER"]),
 });
 
+/** A person's User ID: a UUID, or an ID from another system. */
+export const externalIdSchema = z
+  .string()
+  .trim()
+  .min(1, "Enter a User ID")
+  .max(100, "Keep the User ID under 100 characters")
+  .regex(/^[A-Za-z0-9._:-]+$/, "User IDs can use letters, numbers, dashes, dots, colons and underscores");
+
 export const inviteSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
   name: z.string().trim().min(2, "Enter a name").max(80),
@@ -43,6 +51,8 @@ export const inviteSchema = z.object({
   password: optionalPasswordSchema,
   role: z.enum(["RECEPTION", "FLOOR_STAFF", "SUPER_ADMIN"]),
   floors: z.array(floorMembership).default([]),
+  /** Blank means a UUID is created automatically. */
+  externalId: z.union([z.literal(""), externalIdSchema]).optional(),
 });
 
 export const teamMemberSchema = z.object({

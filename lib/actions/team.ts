@@ -113,7 +113,7 @@ export async function resendTeamInvite(input: { floorId: string; userId: string 
     include: { user: true },
   });
   if (!membership) return { ok: false, error: "That person is not on this floor." };
-  if (membership.user.passwordHash) return { ok: false, error: "They already set a password." };
+  if (membership.user.passwordHash || membership.user.emailVerified) return { ok: false, error: "They have already signed in." };
 
   try {
     await sendInvite({ userId: input.userId, invitedBy: user.name || user.email || "Your floor admin", floorName: floor.name });

@@ -44,6 +44,7 @@ export default async function FloorTeamPage({
           email: true,
           active: true,
           passwordHash: true,
+          emailVerified: true,
           floorAssignments: { select: { floorId: true, floor: { select: { name: true } } } },
         },
       },
@@ -65,7 +66,7 @@ export default async function FloorTeamPage({
             name: m.user.name,
             email: m.user.email,
             active: m.user.active,
-            pending: !m.user.passwordHash,
+            pending: !m.user.passwordHash && !m.user.emailVerified,
             role: m.role,
             otherFloors: m.user.floorAssignments.filter((a) => a.floorId !== floor.id).map((a) => floorLabel(a.floor)),
           }))

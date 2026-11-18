@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'api.dart';
 import 'dates.dart';
 import 'main.dart';
 import 'models.dart';
@@ -24,6 +25,8 @@ class GuestLoader extends ChangeNotifier {
   late String _to;
   String? _floorId;
   Timer? _timer;
+  Timer? _retry;
+  int _failures = 0;
   int _request = 0;
 
   GuestRange? data;
@@ -90,10 +93,18 @@ class GuestLoader extends ChangeNotifier {
       clock = OfficeClock(result.officeMinutes);
       session.today = result.today;
       error = null;
+      _failures = 0;
+      _retry?.cancel();
     } catch (e) {
       if (ticket != _request) return;
       // Keep showing what we had during a quiet refresh; only complain on a real load.
       if (!quiet || data == null) error = e.toString();
+      // Weak signal: try again in 3, 6, then 12 seconds rather than waiting for the next check.
+      if (!(e is ApiException && e.unauthorized) && _failures < 3) {
+        _retry?.cancel();
+        _retry = Timer(Duration(seconds: 3 << _failures), () => load(quiet: true));
+        _failures++;
+      }
     } finally {
       if (ticket == _request) {
         loading = false;
@@ -105,35 +116,64 @@ class GuestLoader extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    _retry?.cancel();
     refreshSignal.removeListener(_onSignal);
     session.removeListener(_onSession);
     super.dispose();
   }
 }
 
-/// Brings a screen back to today: straight away when the office day changes, and
-/// after [idle] when someone was left looking at another date.
+/// Brings a screen back to today: straight away when the office day changes or
+/// the app is reopened, and after [idle] with nobody touching the screen.
 class TodayKeeper {
-  TodayKeeper({required this.loader, required this.current, required this.goToday}) : _lastToday = session.today;
+  TodayKeeper({required this.loader, required this.current, required this.goToday}) : _lastToday = session.today {
+    appReturned.addListener(_cameBack);
+  }
 
-  static const idle = Duration(minutes: 10);
+  static const idle = Duration(minutes: 3);
 
   final GuestLoader loader;
   final String Function() current;
   final void Function(String today) goToday;
   String? _lastToday;
+  bool _returned = false;
   DateTime _moved = DateTime.now();
+
+  void _cameBack() => _returned = true;
+
+  void dispose() => appReturned.removeListener(_cameBack);
 
   /// Call when the person moves to another date.
   void moved() => _moved = DateTime.now();
+
+  /// Whether a screen showing [current] should go back to [today].
+  static bool shouldReturn({
+    required String today,
+    required String current,
+    required bool newDay,
+    required bool reopened,
+    required DateTime lastActive,
+    required DateTime now,
+  }) => current != today && (newDay || reopened || now.difference(lastActive) >= idle);
 
   /// Runs after every load: every 30 seconds, and when the app comes back to the front.
   void check() {
     final today = loader.data?.today;
     if (today == null) return;
     final newDay = today != _lastToday;
+    final reopened = _returned;
     _lastToday = today;
-    if (current() == today) return;
-    if (newDay || DateTime.now().difference(_moved) >= idle) goToday(today);
+    _returned = false;
+    final lastActive = lastTouch.isAfter(_moved) ? lastTouch : _moved;
+    if (shouldReturn(
+      today: today,
+      current: current(),
+      newDay: newDay,
+      reopened: reopened,
+      lastActive: lastActive,
+      now: DateTime.now(),
+    )) {
+      goToday(today);
+    }
   }
 }

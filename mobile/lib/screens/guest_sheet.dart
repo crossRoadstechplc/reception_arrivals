@@ -4,25 +4,34 @@ import '../dates.dart';
 import '../guest_loader.dart';
 import '../main.dart';
 import '../models.dart';
+import '../session.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'guest_form_screen.dart';
 
 /// Details and actions for one guest, as a bottom sheet.
-Future<void> showGuestSheet(BuildContext context, {required Guest guest, required GuestLoader loader}) {
+Future<void> showGuestSheet(
+  BuildContext context, {
+  required Guest guest,
+  required GuestLoader loader,
+  void Function(String date)? onShowDate,
+}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: AppColors.panel,
-    builder: (sheetContext) => _GuestSheet(guest: guest, loader: loader, hostContext: context),
+    builder: (sheetContext) => _GuestSheet(guest: guest, loader: loader, hostContext: context, onShowDate: onShowDate),
   );
 }
 
 class _GuestSheet extends StatefulWidget {
-  const _GuestSheet({required this.guest, required this.loader, required this.hostContext});
+  const _GuestSheet({required this.guest, required this.loader, required this.hostContext, this.onShowDate});
   final Guest guest;
   final GuestLoader loader;
+
+  /// Moves the screen to a guest's new date after an edit.
+  final void Function(String date)? onShowDate;
 
   /// The screen behind the sheet, for messages after the sheet closes.
   final BuildContext hostContext;
@@ -44,7 +53,7 @@ class _GuestSheetState extends State<_GuestSheet> {
     });
     try {
       await action();
-      widget.loader.load(quiet: true);
+      requestRefresh();
       if (!mounted) return;
       Navigator.of(context).pop();
       if (widget.hostContext.mounted) {
@@ -59,7 +68,6 @@ class _GuestSheetState extends State<_GuestSheet> {
 
   void _setStatus(String status) {
     final api = session.api;
-    final loader = widget.loader;
     _run(
       () => api.setStatus(g.id, status),
       status == 'CANCELLED' ? '${g.guestName}’s visit cancelled' : '${g.guestName} restored',
@@ -67,7 +75,7 @@ class _GuestSheetState extends State<_GuestSheet> {
         try {
           await api.setStatus(g.id, status == 'CANCELLED' ? 'EXPECTED' : 'CANCELLED');
         } catch (_) {}
-        loader.load(quiet: true);
+        requestRefresh();
       },
     );
   }
@@ -94,9 +102,10 @@ class _GuestSheetState extends State<_GuestSheet> {
   Future<void> _edit() async {
     final loader = widget.loader;
     final hostContext = widget.hostContext;
+    final onShowDate = widget.onShowDate;
     Navigator.of(context).pop();
     final saved = await openGuestForm(hostContext, date: g.visitDate, guest: g, data: loader.data);
-    if (saved) loader.load(quiet: true);
+    if (saved != null && saved != g.visitDate) onShowDate?.call(saved);
   }
 
   @override

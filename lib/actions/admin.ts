@@ -9,6 +9,7 @@ import type { ActionResult, FloorRole, Role } from "@/lib/types";
 import { sendInvite } from "@/lib/invites";
 import {
   blankToNull,
+  externalIdSchema,
   firstIssue,
   floorInputSchema,
   inviteSchema,
@@ -93,12 +94,36 @@ async function checkFloors(role: Role, floors: FloorMembershipInput[]) {
   return { memberships } as const;
 }
 
+const USER_ID_TAKEN = "That User ID is already used by someone else.";
+
+/** True when another person already has this ID (capital letters don't make it different). */
+async function userIdTaken(externalId: string, exceptUserId?: string) {
+  const match = await db.user.findFirst({
+    where: {
+      externalId: { equals: externalId, mode: "insensitive" },
+      ...(exceptUserId ? { id: { not: exceptUserId } } : {}),
+    },
+    select: { id: true },
+  });
+  return Boolean(match);
+}
+
+function isUserIdClash(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002" &&
+    JSON.stringify(error.meta ?? {}).includes("external")
+  );
+}
+
 export async function inviteUser(input: {
   email: string;
   name: string;
   password: string;
   role: Role;
   floors: FloorMembershipInput[];
+  /** Leave blank to create a UUID automatically. */
+  externalId?: string;
 }): Promise<ActionResult> {
   const actor = await requireRoles(["SUPER_ADMIN"]);
   const parsed = inviteSchema.safeParse(input);
@@ -113,19 +138,29 @@ export async function inviteUser(input: {
   const checked = await checkFloors(parsed.data.role, parsed.data.floors);
   if ("error" in checked) return { ok: false, error: checked.error! };
 
+  const externalId = parsed.data.externalId || undefined;
+  if (externalId && (await userIdTaken(externalId))) return { ok: false, error: USER_ID_TAKEN };
+
   const password = parsed.data.password;
-  const created = await db.user.create({
-    data: {
-      email,
-      name: parsed.data.name,
-      role: parsed.data.role,
-      passwordHash: password ? await hashPassword(password) : null,
-      active: true,
-      floorAssignments: {
-        create: checked.memberships.map((m) => ({ floorId: m.floorId, role: m.role })),
+  let created;
+  try {
+    created = await db.user.create({
+      data: {
+        email,
+        name: parsed.data.name,
+        role: parsed.data.role,
+        passwordHash: password ? await hashPassword(password) : null,
+        active: true,
+        ...(externalId ? { externalId } : {}),
+        floorAssignments: {
+          create: checked.memberships.map((m) => ({ floorId: m.floorId, role: m.role })),
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if (isUserIdClash(error)) return { ok: false, error: USER_ID_TAKEN };
+    throw error;
+  }
 
   refreshAdmin();
   if (password) {
@@ -147,6 +182,7 @@ export async function updateUser(input: {
   active: boolean;
   floors: FloorMembershipInput[];
   password?: string;
+  externalId?: string;
 }): Promise<ActionResult> {
   const actor = await requireRoles(["SUPER_ADMIN"]);
   if (input.name.trim().length < 2) {
@@ -167,25 +203,39 @@ export async function updateUser(input: {
   const user = await db.user.findUnique({ where: { id: input.userId } });
   if (!user) return { ok: false, error: "Person not found." };
 
-  await db.$transaction([
-    db.user.update({
-      where: { id: user.id },
-      data: {
-        name: input.name.trim(),
-        role: input.role,
-        active: input.active,
-        ...(password ? { passwordHash: await hashPassword(password) } : {}),
-      },
-    }),
-    db.floorAssignment.deleteMany({ where: { userId: user.id } }),
-    ...(checked.memberships.length
-      ? [
-          db.floorAssignment.createMany({
-            data: checked.memberships.map((m) => ({ userId: user.id, floorId: m.floorId, role: m.role })),
-          }),
-        ]
-      : []),
-  ]);
+  let externalId: string | undefined;
+  if (input.externalId !== undefined) {
+    const parsedId = externalIdSchema.safeParse(input.externalId);
+    if (!parsedId.success) return { ok: false, error: firstIssue(parsedId.error) };
+    externalId = parsedId.data;
+    if (await userIdTaken(externalId, user.id)) return { ok: false, error: USER_ID_TAKEN };
+  }
+
+  try {
+    await db.$transaction([
+      db.user.update({
+        where: { id: user.id },
+        data: {
+          name: input.name.trim(),
+          role: input.role,
+          active: input.active,
+          ...(externalId ? { externalId } : {}),
+          ...(password ? { passwordHash: await hashPassword(password) } : {}),
+        },
+      }),
+      db.floorAssignment.deleteMany({ where: { userId: user.id } }),
+      ...(checked.memberships.length
+        ? [
+            db.floorAssignment.createMany({
+              data: checked.memberships.map((m) => ({ userId: user.id, floorId: m.floorId, role: m.role })),
+            }),
+          ]
+        : []),
+    ]);
+  } catch (error) {
+    if (isUserIdClash(error)) return { ok: false, error: USER_ID_TAKEN };
+    throw error;
+  }
 
   refreshAdmin();
   return { ok: true };

@@ -125,12 +125,25 @@ export async function sendInviteEmail(input: { email: string; name: string | nul
   await sendMail({
     to: input.email,
     subject: `You're invited to Arrival Desk${where}`,
-    text: `${input.invitedBy} added you to Arrival Desk${where}. Set your password to sign in:\n${input.url}\n\nThis link expires in 7 days.`,
+    text: `${input.invitedBy} added you to Arrival Desk${where}. Sign in with this email address; we'll send you a code, so there's no password to remember:\n${input.url}`,
     html: layout({
       heading: `Welcome${input.name ? `, ${escapeHtml(input.name)}` : ""}`,
       body: `${escapeHtml(input.invitedBy)} added you to Arrival Desk${escapeHtml(where)}. You can list the guests you expect, and you'll be told when they arrive at reception.`,
-      button: { label: "Set your password", url: input.url },
-      footer: "This link expires in 7 days.",
+      button: { label: "Sign in to Arrival Desk", url: input.url },
+      footer: "We'll email you a code to sign in, so there's no password to remember.",
+    }),
+  });
+}
+
+export async function sendLoginCodeEmail(input: { email: string; code: string; minutes: number }) {
+  await sendMail({
+    to: input.email,
+    subject: `${input.code} is your Arrival Desk sign-in code`,
+    text: `Your Arrival Desk sign-in code is ${input.code}. It expires in ${input.minutes} minutes. If you didn't ask for it, you can ignore this email.`,
+    html: layout({
+      heading: "Your sign-in code",
+      body: `<p style="margin:0;font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:#14201b;">${escapeHtml(input.code)}</p>`,
+      footer: `This code expires in ${input.minutes} minutes. If you didn't ask for it, you can ignore this email.`,
     }),
   });
 }

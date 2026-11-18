@@ -6,13 +6,12 @@ import { createClient } from "@supabase/supabase-js";
 
 export type LiveState = "connecting" | "live" | "offline";
 
-const FALLBACK_POLL_MS = 30_000;
-const DAY_CHECK_MS = 5 * 60_000;
+const BACKUP_CHECK_MS = 30_000;
 const BACK_TO_TODAY_MS = 10 * 60_000;
 
 /**
- * Refreshes server data when any guest changes. Uses the Supabase broadcast
- * channel when it is configured, and falls back to polling every 30 seconds.
+ * Refreshes server data when any guest changes, through the Supabase broadcast
+ * channel when it is configured, with a check every 30 seconds as the backup.
  */
 export function useLiveRefresh() {
   const router = useRouter();
@@ -37,25 +36,21 @@ export function useLiveRefresh() {
     };
   }, [router, supabaseKey, supabaseUrl]);
 
+  // Always runs as a backup, in case a live update is ever missed.
   useEffect(() => {
-    if (live === "live") return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") router.refresh();
-    }, FALLBACK_POLL_MS);
+    }, BACKUP_CHECK_MS);
     return () => window.clearInterval(timer);
-  }, [live, router]);
+  }, [router]);
 
-  // Live updates only fire when guests change, so also catch a new day: on return to the tab and every few minutes.
+  // Coming back to the tab shows the latest guests (and a new day) right away.
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === "visible") router.refresh();
     };
     document.addEventListener("visibilitychange", refresh);
-    const timer = window.setInterval(refresh, DAY_CHECK_MS);
-    return () => {
-      document.removeEventListener("visibilitychange", refresh);
-      window.clearInterval(timer);
-    };
+    return () => document.removeEventListener("visibilitychange", refresh);
   }, [router]);
 
   return live;

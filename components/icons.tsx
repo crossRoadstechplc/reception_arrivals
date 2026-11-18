@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 type IconProps = { className?: string };
 
 function Svg({ className = "size-4", children }: IconProps & { children: React.ReactNode }) {
@@ -195,6 +197,13 @@ export const ClockIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const CopyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </Svg>
+);
+
 export const AlertIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />
@@ -203,15 +212,17 @@ export const AlertIcon = (p: IconProps) => (
 );
 
 export function LogoMark({ className = "size-8" }: IconProps) {
+  // Unique per logo: a shared id breaks when the first logo on the page is hidden.
+  const fillId = useId();
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true" className={`shrink-0 ${className}`}>
       <defs>
-        <linearGradient id="logo-fill" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#e46a37" />
           <stop offset="1" stopColor="#c94f20" />
         </linearGradient>
       </defs>
-      <rect width="64" height="64" rx="15" fill="url(#logo-fill)" />
+      <rect width="64" height="64" rx="15" fill={`url(#${fillId})`} />
       <g fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round">
         <path d="M20 43 32 18l12 25" strokeWidth="5.5" />
         <path d="M25.5 34h13" strokeWidth="5" />

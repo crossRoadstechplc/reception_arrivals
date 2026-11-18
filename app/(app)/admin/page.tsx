@@ -38,11 +38,12 @@ export default async function AdminPage() {
         }))}
         users={users.map((person) => ({
           id: person.id,
+          externalId: person.externalId,
           name: person.name,
           email: person.email,
           role: person.role,
           active: person.active,
-          pending: !person.passwordHash,
+          pending: !person.passwordHash && !person.emailVerified,
           floors: person.floorAssignments.map((assignment) => ({ floorId: assignment.floorId, role: assignment.role })),
         }))}
       />

@@ -1,4 +1,5 @@
 import 'package:arrival_desk/dates.dart';
+import 'package:arrival_desk/guest_loader.dart';
 import 'package:arrival_desk/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,6 +12,25 @@ void main() {
     expect(rangeLabel('2026-11-30', '2026-12-04'), '30 Nov – 4 Dec 2026');
     expect(clockLabel(14 * 60 + 5), '2:05 PM');
     expect(clockLabel(0), '12:00 AM');
+  });
+
+  test('screens return to today', () {
+    final now = DateTime(2026, 11, 18, 10);
+    bool back({String current = '2026-11-17', bool newDay = false, bool reopened = false, int idleMinutes = 0}) =>
+        TodayKeeper.shouldReturn(
+          today: '2026-11-18',
+          current: current,
+          newDay: newDay,
+          reopened: reopened,
+          lastActive: now.subtract(Duration(minutes: idleMinutes)),
+          now: now,
+        );
+    expect(back(), isFalse); // someone is using another date right now
+    expect(back(idleMinutes: 2), isFalse);
+    expect(back(idleMinutes: 3), isTrue);
+    expect(back(newDay: true), isTrue);
+    expect(back(reopened: true), isTrue);
+    expect(back(current: '2026-11-18', newDay: true, reopened: true, idleMinutes: 60), isFalse); // already on today
   });
 
   test('guest kind: late only today, arrived and gone win', () {

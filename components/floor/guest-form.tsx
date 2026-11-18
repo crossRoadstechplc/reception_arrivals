@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveGuest } from "@/lib/actions/guests";
 import { OTHER_HOST } from "@/lib/types";
@@ -72,6 +72,7 @@ export function GuestForm({
   guest,
   onClose,
   onSaved,
+  onShowDate,
 }: {
   date: string;
   today: string;
@@ -86,12 +87,15 @@ export function GuestForm({
   guest: FloorGuest | null;
   onClose: () => void;
   onSaved: (name: string, isNew: boolean) => void;
+  /** Called on closing with the date of the last guest saved, so the page can show that day. */
+  onShowDate?: (date: string) => void;
 }) {
   const router = useRouter();
   const isNew = !guest;
   const [step, setStep] = useState(isNew ? 0 : REVIEW);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(0);
+  const savedDate = useRef<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const [guestName, setGuestName] = useState(guest?.guestName ?? "");
@@ -114,6 +118,11 @@ export function GuestForm({
   }, [people, hosts, guest]);
   // The host is never also on the notify list.
   const notifyList = notify.filter((id) => id !== hostId);
+
+  function close() {
+    if (savedDate.current) onShowDate?.(savedDate.current);
+    onClose();
+  }
 
   function problem(at: number): string | null {
     if (at === 0 && guestName.trim().length < 2) return "Enter the guest’s name.";
@@ -176,6 +185,7 @@ export function GuestForm({
         setError(result.error);
         return;
       }
+      savedDate.current = visitDate;
       router.refresh();
       onSaved(name, isNew);
       if (another && isNew) {
@@ -195,7 +205,7 @@ export function GuestForm({
         setStep(0);
         return;
       }
-      onClose();
+      close();
     });
   }
 
@@ -213,11 +223,11 @@ export function GuestForm({
       title={isNew ? "Add guest" : "Edit guest"}
       description={added > 0 ? `${added} added so far.` : floorName}
       size="xl"
-      onClose={onClose}
+      onClose={close}
       footer={
         step === REVIEW ? (
           <>
-            <button type="button" className="btn btn-ghost mr-auto" onClick={onClose}>
+            <button type="button" className="btn btn-ghost mr-auto" onClick={close}>
               {added > 0 ? "Done" : "Cancel"}
             </button>
             {isNew ? (
@@ -236,7 +246,7 @@ export function GuestForm({
                 Back
               </button>
             ) : (
-              <button type="button" className="btn btn-ghost mr-auto" onClick={onClose}>
+              <button type="button" className="btn btn-ghost mr-auto" onClick={close}>
                 Cancel
               </button>
             )}

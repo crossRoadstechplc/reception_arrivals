@@ -36,6 +36,8 @@ enum GuestStatus {
 
 model User {
   id            String    @id @default(cuid())
+  /// The ID other systems use for this person: a UUID unless a super admin sets their own.
+  externalId    String    @unique @default(dbgenerated("(gen_random_uuid())::text")) @map("external_id")
   name          String?
   email         String?   @unique
   emailVerified DateTime? @map("email_verified")

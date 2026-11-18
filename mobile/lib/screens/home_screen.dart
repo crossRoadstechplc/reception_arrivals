@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../session.dart';
 import '../widgets.dart';
 import 'calendar_screen.dart';
 import 'guests_screen.dart';
@@ -53,7 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tab,
-            onDestinationSelected: (i) => setState(() => _tab = i),
+            onDestinationSelected: (i) {
+              if (i == 0) guestsTabTapped.value++;
+              setState(() => _tab = i);
+            },
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.list_alt_outlined),

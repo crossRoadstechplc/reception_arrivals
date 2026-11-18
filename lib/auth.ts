@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { db } from "@/lib/db";
+import { verifyLoginCode } from "@/lib/login-code";
 import { verifyPassword } from "@/lib/password";
 import type { Role } from "@/lib/types";
 
@@ -20,13 +21,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    // Renewed while in use (components/session-keep-alive.tsx), so this only ends after 6 months away.
+    maxAge: 180 * 24 * 60 * 60,
   },
   pages: {
     signIn: "/login",
     error: "/login",
   },
   providers: [
+    // Sign in with a 6-digit code sent by email.
+    Credentials({
+      id: "email-code",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Code", type: "text" },
+      },
+      async authorize(credentials) {
+        const userId = await verifyLoginCode(String(credentials?.email ?? ""), String(credentials?.code ?? ""));
+        if (!userId) return null;
+        const user = await db.user.findUnique({ where: { id: userId } });
+        if (!user?.active || !user.email) return null;
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
+      },
+    }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -65,7 +82,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       const id = typeof token.id === "string" ? token.id : undefined;
       if (!id) return session;
-      const dbUser = await db.user.findUnique({ where: { id } });
+      let dbUser;
+      try {
+        dbUser = await db.user.findUnique({ where: { id } });
+      } catch (error) {
+        // A database hiccup must not sign anyone out: an error here would clear their cookie.
+        console.error("Session check could not reach the database", error);
+        session.user.id = id;
+        session.user.role = token.role as Role;
+        return session;
+      }
       if (!dbUser?.active || !dbUser.email) return session;
       session.user.id = dbUser.id;
       session.user.role = dbUser.role as Role;

@@ -72,6 +72,14 @@ class Api {
     return (data['token'] as String, AppUser.fromJson(data['user'] as Map<String, dynamic>));
   }
 
+  /// Emails a 6-digit sign-in code.
+  Future<void> requestLoginCode(String email) => _send('POST', '/login-code', body: {'email': email.trim()});
+
+  Future<(String token, AppUser user)> verifyLoginCode(String email, String code) async {
+    final data = await _send('POST', '/login-code/verify', body: {'email': email.trim(), 'code': code.trim()});
+    return (data['token'] as String, AppUser.fromJson(data['user'] as Map<String, dynamic>));
+  }
+
   Future<Me> me() async => Me.fromJson(await _send('GET', '/me'));
 
   Future<GuestRange> guests({required String floorId, required String from, required String to}) async =>

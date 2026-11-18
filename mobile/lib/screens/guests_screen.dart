@@ -6,6 +6,7 @@ import '../dates.dart';
 import '../guest_loader.dart';
 import '../main.dart';
 import '../models.dart';
+import '../session.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'guest_form_screen.dart';
@@ -31,12 +32,20 @@ class _GuestsScreenState extends State<GuestsScreen> {
     _loader = GuestLoader(from: _date, to: _date);
     _keeper = TodayKeeper(loader: _loader, current: () => _date, goToday: _go);
     _loader.addListener(_keeper.check);
+    guestsTabTapped.addListener(_openToday);
   }
 
   @override
   void dispose() {
+    guestsTabTapped.removeListener(_openToday);
+    _keeper.dispose();
     _loader.dispose();
     super.dispose();
+  }
+
+  void _openToday() {
+    final today = _loader.today;
+    if (_date != today) _go(today);
   }
 
   void _go(String date) {
@@ -58,7 +67,8 @@ class _GuestsScreenState extends State<GuestsScreen> {
   Future<void> _add() async {
     final today = _loader.today;
     final saved = await openGuestForm(context, date: _date.compareTo(today) < 0 ? today : _date, data: _loader.data);
-    if (saved) _loader.load(quiet: true);
+    // Show the day the guest was saved on, so they can see them.
+    if (saved != null && saved != _date && mounted) _go(saved);
   }
 
   @override
@@ -94,7 +104,7 @@ class _GuestsScreenState extends State<GuestsScreen> {
                         guest: list[i],
                         kind: list[i].kind(today: today, nowMinutes: now),
                         showHost: isAdmin,
-                        onTap: () => showGuestSheet(context, guest: list[i], loader: _loader),
+                        onTap: () => showGuestSheet(context, guest: list[i], loader: _loader, onShowDate: _go),
                       ),
                     ],
                   ],
@@ -181,7 +191,7 @@ class _GuestsScreenState extends State<GuestsScreen> {
   }
 }
 
-/// Arrival Desk, then this floor and its company. Tap to switch floors if you're on several.
+/// This floor's banner: its company, your name, floor and role. Tap to switch floors if you're on several.
 class _FloorBanner extends StatelessWidget {
   const _FloorBanner();
 
@@ -193,8 +203,11 @@ class _FloorBanner extends StatelessWidget {
         final floor = session.floor;
         if (floor == null) return const SizedBox.shrink();
         final company = floor.company;
+        final person = [session.user?.displayName, if (company != null) floor.floorName].nonNulls.join(' · ');
         final banner = BrandBanner(
-          headline: company == null ? floor.floorName : '${floor.floorName} · $company',
+          title: company ?? floor.floorName,
+          subtitle: person,
+          role: floor.roleLabel,
           canSwitch: session.floors.length > 1,
         );
         if (session.floors.length < 2) return banner;
@@ -235,41 +248,42 @@ class _DateBar extends StatelessWidget {
       children: [
         IconButton(tooltip: 'Previous day', onPressed: onPrev, icon: const Icon(Icons.chevron_left)),
         Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: onPick,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: onPick,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  child: Column(
                     children: [
-                      Flexible(
-                        child: Text(
-                          label,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              label,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, letterSpacing: -0.3),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+                        ],
                       ),
-                      const Icon(Icons.arrow_drop_down, color: AppColors.muted),
+                      if (sub != null) Text(sub!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                     ],
                   ),
-                  if (sub != null) Text(sub!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                  if (!isToday)
-                    GestureDetector(
-                      onTap: onToday,
-                      child: const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: Text(
-                          'Back to today',
-                          style: TextStyle(color: AppColors.signalDeep, fontSize: 12.5, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
+              if (!isToday)
+                TextButton.icon(
+                  onPressed: onToday,
+                  icon: const Icon(Icons.today, size: 18),
+                  label: const Text('Back to today'),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.signalDeep, minimumSize: const Size(48, 44)),
+                ),
+            ],
           ),
         ),
         IconButton(tooltip: 'Next day', onPressed: onNext, icon: const Icon(Icons.chevron_right)),

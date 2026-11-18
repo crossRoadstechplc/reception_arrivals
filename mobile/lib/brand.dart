@@ -51,12 +51,18 @@ class BrandLogoPainter extends CustomPainter {
   bool shouldRepaint(BrandLogoPainter old) => old.strokes != strokes || old.underline != underline;
 }
 
-/// Home banner: "Arrival Desk", then this floor and its company in large type.
+/// The home page banner: the logo with this floor's company, the person and their role.
 class BrandBanner extends StatelessWidget {
-  const BrandBanner({super.key, required this.headline, this.canSwitch = false});
+  const BrandBanner({super.key, required this.title, required this.role, this.subtitle, this.canSwitch = false});
 
-  /// Floor and company, e.g. "6th Floor · SPX".
-  final String headline;
+  /// The company on this floor (or the floor's name if it has no company).
+  final String title;
+
+  /// The account holder's name and floor, e.g. "Dawit Tefera · 6th Floor".
+  final String? subtitle;
+
+  /// "Floor admin" or "Floor staff".
+  final String role;
 
   /// Shows an arrow when the person works on several floors.
   final bool canSwitch;
@@ -65,10 +71,10 @@ class BrandBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: 'Arrival Desk. $headline',
+      label: [title, ?subtitle, role].join('. '),
       child: ExcludeSemantics(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: AppColors.panel,
             borderRadius: BorderRadius.circular(16),
@@ -77,10 +83,10 @@ class BrandBanner extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 68,
-                height: 68,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(15),
                   gradient: const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -95,32 +101,52 @@ class BrandBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Arrival Desk',
-                      style: TextStyle(
-                        color: AppColors.signalDeep,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.2,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 22,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.signalSoft,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            role,
+                            style: const TextStyle(
+                              color: AppColors.signalDeep,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      headline,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 26,
-                        height: 1.15,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
+                    if (subtitle != null && subtitle!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppColors.muted, fontSize: 13.5),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              if (canSwitch) const Icon(Icons.arrow_drop_down, color: AppColors.ink, size: 28),
+              if (canSwitch) const Icon(Icons.arrow_drop_down, color: AppColors.ink, size: 26),
             ],
           ),
         ),

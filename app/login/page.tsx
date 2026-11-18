@@ -14,7 +14,7 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; email?: string }>;
 }) {
   try {
     const user = await getCurrentUser();
@@ -28,7 +28,7 @@ export default async function LoginPage({
 
   return (
     <AuthShell>
-      <LoginForm banner={banner} />
+      <LoginForm banner={banner} defaultEmail={params.email?.slice(0, 200) ?? ""} />
     </AuthShell>
   );
 }

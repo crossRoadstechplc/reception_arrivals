@@ -3,6 +3,7 @@
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { requestLoginCode, type CodeRequestResult } from "@/lib/login-code";
 import { appUrl, sendPasswordResetEmail } from "@/lib/mail";
 import { hashPassword, hashResetToken, newResetToken } from "@/lib/password";
 
@@ -55,6 +56,32 @@ export async function login(
     };
   }
 
+  return null;
+}
+
+/** Emails a 6-digit sign-in code. */
+export async function sendLoginCode(email: string): Promise<CodeRequestResult> {
+  try {
+    return await requestLoginCode(email);
+  } catch (error) {
+    console.error("Sign-in code request failed", error);
+    return { ok: false, error: "Couldn't send the code. Try again, or use your password." };
+  }
+}
+
+export async function loginWithCode(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const code = String(formData.get("code") ?? "").replace(/\s+/g, "");
+  if (!/^\d{6}$/.test(code)) return { error: "Enter the 6-digit code from your email." };
+
+  try {
+    await signIn("email-code", { email, code, redirectTo: "/" });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    if (error instanceof AuthError) return { error: "That code is wrong or has expired." };
+    console.error(error);
+    return { error: "Couldn't sign you in. Try again." };
+  }
   return null;
 }
 
