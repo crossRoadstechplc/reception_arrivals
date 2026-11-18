@@ -2,9 +2,19 @@ import type { Guest } from "@prisma/client";
 import { db } from "@/lib/db";
 import { formatClock, formatTimeOfDay, fromDateOnly } from "@/lib/dates";
 import { canEditGuest, floorRoleOf, type AppUser } from "@/lib/permissions";
+import { guestBookingView, roomBookingAvailable, roomBookingOn } from "@/lib/room-booking";
 import { floorLabel, type FloorRole } from "@/lib/types";
 
-export type FloorChoice = { id: string; name: string; number: number; role: FloorRole };
+export type FloorChoice = {
+  id: string;
+  name: string;
+  number: number;
+  role: FloorRole;
+  /** The floor is connected to a booking system, so its admin can switch booking on. */
+  roomBookingAvailable: boolean;
+  /** Booking is switched on: the guest form offers a meeting room. */
+  roomBookingOn: boolean;
+};
 
 /**
  * The floors a person works on, the one they're looking at, their role there,
@@ -19,6 +29,8 @@ export async function loadFloorContext(user: AppUser, requestedFloorId?: string)
           name: floorLabel(floor),
           number: floor.number,
           role: "ADMIN" as const,
+          roomBookingAvailable: roomBookingAvailable(floor),
+          roomBookingOn: roomBookingOn(floor),
         }))
       : user.floorAssignments
           .filter((assignment) => assignment.floor.active)
@@ -28,6 +40,8 @@ export async function loadFloorContext(user: AppUser, requestedFloorId?: string)
             name: floorLabel(assignment.floor),
             number: assignment.floor.number,
             role: assignment.role,
+            roomBookingAvailable: roomBookingAvailable(assignment.floor),
+            roomBookingOn: roomBookingOn(assignment.floor),
           }));
 
   const floorId = floors.find((floor) => floor.id === requestedFloorId)?.id ?? floors[0]?.id ?? null;
@@ -96,6 +110,8 @@ export function toFloorGuest(guest: FloorGuestRecord, viewer: AppUser) {
     notes: guest.notes,
     licensePlate: guest.licensePlate,
     vehicle: guest.vehicle,
+    /** The meeting room for this visit, if one was asked for. */
+    booking: guestBookingView(guest),
     expectedLabel: formatTimeOfDay(guest.expectedArrival),
     checkedInLabel: checkedIn ? formatClock(checkedIn) : null,
   };

@@ -5,7 +5,8 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteGuest, setFloorGuestStatus } from "@/lib/actions/guests";
 import { GuestForm } from "@/components/floor/guest-form";
-import { FLOOR_ROLE_LABEL, type FloorRole, type GuestStatus } from "@/lib/types";
+import { RoomLine } from "@/components/floor/room-line";
+import { FLOOR_ROLE_LABEL, type BookingOutcome, type FloorRole, type GuestStatus } from "@/lib/types";
 import {
   Alert,
   ConfirmDialog,
@@ -36,6 +37,15 @@ export type FloorGuest = {
   notes: string | null;
   licensePlate: string | null;
   vehicle: string | null;
+  /** The meeting room for this visit, if one was asked for. */
+  booking: {
+    booked: boolean;
+    roomId: string | null;
+    roomName: string | null;
+    minutes: number | null;
+    timeLabel: string | null;
+    problem: string | null;
+  } | null;
   expectedLabel: string | null;
   checkedInLabel: string | null;
   /** Colleagues on the "Also notify" list. */
@@ -46,7 +56,7 @@ export type FloorGuest = {
   canEdit: boolean;
 };
 
-type FloorOption = { id: string; name: string; number: number; role: FloorRole };
+type FloorOption = { id: string; name: string; number: number; role: FloorRole; roomBookingOn: boolean };
 export type HostOption = { id: string; name: string };
 
 export function GuestManager({
@@ -100,6 +110,12 @@ export function GuestManager({
     [guests],
   );
 
+  /** A room problem stays on screen until it's dismissed; good news is a toast. */
+  function announce(message: string, booking?: BookingOutcome, action?: { label: string; onClick: () => void }) {
+    if (booking?.kind === "taken" || booking?.kind === "failed") setError(booking.message);
+    show({ message: booking?.kind === "booked" || booking?.kind === "cancelled" ? `${message}. ${booking.message}` : message, action });
+  }
+
   function visit(next: { date?: string; floorId?: string }) {
     const params = new URLSearchParams();
     const nextDate = next.date ?? date;
@@ -121,13 +137,13 @@ export function GuestManager({
         return;
       }
       router.refresh();
-      if (undo) return;
-      show({
-        message: status === "CANCELLED" ? `${guest.guestName}'s visit cancelled` : `${guest.guestName} restored`,
-        action: {
-          label: "Undo",
-          onClick: () => changeStatus(guest, status === "CANCELLED" ? "EXPECTED" : "CANCELLED", true),
-        },
+      if (undo) {
+        if (result.booking?.kind === "taken" || result.booking?.kind === "failed") setError(result.booking.message);
+        return;
+      }
+      announce(status === "CANCELLED" ? `${guest.guestName}'s visit cancelled` : `${guest.guestName} restored`, result.booking, {
+        label: "Undo",
+        onClick: () => changeStatus(guest, status === "CANCELLED" ? "EXPECTED" : "CANCELLED", true),
       });
     });
   }
@@ -271,6 +287,7 @@ export function GuestManager({
                             </span>
                           ) : null}
                         </p>
+                        {inactive ? null : <RoomLine booking={guest.booking} />}
                         {guest.notifyUsers.length ? (
                           <p className="mt-1.5 inline-flex max-w-full items-start gap-1.5 text-xs text-muted">
                             <BellIcon className="mt-px size-3.5 shrink-0" />
@@ -352,9 +369,10 @@ export function GuestManager({
           hosts={hosts}
           people={people}
           recentCompanies={recentCompanies}
+          roomBooking={floor?.roomBookingOn ?? false}
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
-          onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
+          onSaved={(name, isNew, booking) => announce(isNew ? `${name} added` : `${name} updated`, booking)}
           onShowDate={(saved) => {
             if (saved !== date) visit({ date: saved });
           }}

@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { FloorTabs } from "@/components/floor/floor-tabs";
+import { RoomBookingToggle } from "@/components/floor/room-booking-toggle";
 import { TeamManager } from "@/components/floor/team-manager";
 import { db } from "@/lib/db";
 import { requireRoles } from "@/lib/permissions";
 import { navItems } from "@/lib/roles";
+import { roomBookingAvailable } from "@/lib/room-booking";
 import { floorLabel } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Floor team" };
@@ -55,6 +57,7 @@ export default async function FloorTeamPage({
     <main className="min-h-dvh bg-paper">
       <AppHeader user={user} items={navItems(user.role, "floor")} />
       <FloorTabs floorId={floor.id} current="team" multiFloor={visibleFloorCount > 1} showTeam />
+      {roomBookingAvailable(floor) ? <RoomBookingToggle floorId={floor.id} enabled={floor.roomBookingEnabled} /> : null}
       <TeamManager
         floor={{ id: floor.id, name: floorLabel(floor), number: floor.number }}
         floors={managed.map((f) => ({ id: f.id, name: floorLabel(f), number: f.number }))}

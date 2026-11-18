@@ -4,7 +4,15 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { GuestStatus as PrismaGuestStatus } from "@prisma/client";
 import { db } from "@/lib/db";
-import { deleteGuestAs, refreshBoards, saveGuestAs, setFloorGuestStatusAs, type SaveGuestInput } from "@/lib/guest-service";
+import {
+  deleteGuestAs,
+  refreshBoards,
+  roomsForFormAs,
+  saveGuestAs,
+  setFloorGuestStatusAs,
+  setRoomBookingAs,
+  type SaveGuestInput,
+} from "@/lib/guest-service";
 import { notifyArrival } from "@/lib/notify";
 import { requireRoles, requireUser } from "@/lib/permissions";
 import { notifyGuestsChanged } from "@/lib/realtime";
@@ -21,6 +29,16 @@ export async function setFloorGuestStatus(guestId: string, status: "EXPECTED" | 
 /** Permanently removes a cancelled or no-show guest. Cleared guests stay as a record. */
 export async function deleteGuest(guestId: string): Promise<ActionResult> {
   return deleteGuestAs(await requireRoles(["FLOOR_STAFF", "SUPER_ADMIN"]), guestId);
+}
+
+/** Meeting rooms and their taken times, for the guest form. */
+export async function loadRooms(input: { floorId: string; date: string; guestId?: string }) {
+  return roomsForFormAs(await requireRoles(["FLOOR_STAFF", "SUPER_ADMIN"]), input);
+}
+
+/** Floor admins: offer meeting room booking on this floor's guest form, or stop offering it. */
+export async function setRoomBooking(floorId: string, enabled: boolean): Promise<ActionResult> {
+  return setRoomBookingAs(await requireRoles(["FLOOR_STAFF", "SUPER_ADMIN"]), floorId, enabled);
 }
 
 const receptionStatuses = new Set<GuestStatus>(["EXPECTED", "ARRIVED", "CLEARED", "NO_SHOW"]);

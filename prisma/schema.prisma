@@ -128,6 +128,8 @@ model Floor {
   company   String?
   number    Int      @unique
   active    Boolean  @default(true)
+  /// The floor admin's switch for offering meeting room booking on the guest form.
+  roomBookingEnabled Boolean @default(false) @map("room_booking_enabled")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -179,6 +181,20 @@ model Guest {
   licensePlate    String?     @map("license_plate")
   /// e.g. "White Toyota Corolla".
   vehicle         String?
+  /// The meeting room booked for this visit, in the floor's booking system.
+  bookingId       String?     @map("booking_id")
+  /// "BOOKED", "FAILED", or "RELEASED" (freed because the visit was cancelled).
+  bookingStatus   String?     @map("booking_status")
+  bookingRoomId   String?     @map("booking_room_id")
+  bookingRoomName String?     @map("booking_room_name")
+  bookingStartsAt DateTime?   @map("booking_starts_at")
+  bookingEndsAt   DateTime?   @map("booking_ends_at")
+  /// The host's employee code the booking was made under.
+  bookingEmployee String?     @map("booking_employee")
+  bookingTitle    String?     @map("booking_title")
+  /// Booking references can't be reused, so each new booking for a guest counts up.
+  bookingAttempt  Int         @default(0) @map("booking_attempt")
+  bookingError    String?     @map("booking_error")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

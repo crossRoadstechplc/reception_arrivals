@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveGuest } from "@/lib/actions/guests";
-import { OTHER_HOST } from "@/lib/types";
+import { loadRooms, saveGuest } from "@/lib/actions/guests";
+import { BOOKING_LENGTHS, OTHER_HOST, type BookingOutcome, type RoomOption } from "@/lib/types";
 import { Alert, Modal, PlateTag } from "@/components/ui";
 import { TimeField } from "@/components/time-field";
 import {
   BellIcon,
+  BuildingIcon,
   CalendarIcon,
   CarIcon,
   CheckIcon,
@@ -44,6 +45,15 @@ function timeLabel(hhmm: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
+function clockMinutes(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function lengthLabel(minutes: number) {
+  if (minutes % 60 !== 0) return `${minutes} min`;
+  return minutes === 60 ? "1 hour" : `${minutes / 60} hours`;
+}
+
 const QUICK_TIMES = ["09:00", "10:00", "11:00", "14:00", "15:00"];
 
 const STEPS = [
@@ -69,6 +79,7 @@ export function GuestForm({
   hosts,
   people,
   recentCompanies = [],
+  roomBooking = false,
   guest,
   onClose,
   onSaved,
@@ -84,9 +95,11 @@ export function GuestForm({
   /** Everyone on the floor, for "Also notify". */
   people: HostOption[];
   recentCompanies?: string[];
+  /** The floor offers meeting room booking. */
+  roomBooking?: boolean;
   guest: FloorGuest | null;
   onClose: () => void;
-  onSaved: (name: string, isNew: boolean) => void;
+  onSaved: (name: string, isNew: boolean, booking?: BookingOutcome) => void;
   /** Called on closing with the date of the last guest saved, so the page can show that day. */
   onShowDate?: (date: string) => void;
 }) {
@@ -109,6 +122,38 @@ export function GuestForm({
   const [plate, setPlate] = useState(guest?.licensePlate ?? "");
   const [vehicle, setVehicle] = useState(guest?.vehicle ?? "");
   const [notes, setNotes] = useState(guest?.notes ?? "");
+  const [bookRoom, setBookRoom] = useState(roomBooking && Boolean(guest?.booking));
+  const [roomId, setRoomId] = useState(guest?.booking?.roomId ?? "");
+  const [minutes, setMinutes] = useState(guest?.booking?.minutes ?? 60);
+  const [roomDay, setRoomDay] = useState<{ date: string; rooms: RoomOption[]; error: string | null } | null>(null);
+
+  const wantsRoom = roomBooking && bookRoom;
+  const roomsLoading = wantsRoom && roomDay?.date !== visitDate;
+  const rooms = roomDay?.date === visitDate ? roomDay.rooms : [];
+  const selectedRoom = rooms.find((room) => room.id === roomId) ?? rooms[0] ?? null;
+  const chosenRoomId = selectedRoom?.id ?? roomId;
+  const guestId = guest?.id;
+
+  // The rooms and the times already taken on the chosen day.
+  useEffect(() => {
+    if (!wantsRoom) return;
+    let stale = false;
+    loadRooms({ floorId, date: visitDate, guestId })
+      .then((result) => {
+        if (stale) return;
+        setRoomDay(
+          result.ok
+            ? { date: visitDate, rooms: result.rooms, error: null }
+            : { date: visitDate, rooms: [], error: result.error },
+        );
+      })
+      .catch(() => {
+        if (!stale) setRoomDay({ date: visitDate, rooms: [], error: "Meeting rooms can’t be loaded right now because of a server problem." });
+      });
+    return () => {
+      stale = true;
+    };
+  }, [wantsRoom, floorId, visitDate, guestId]);
 
   const hostId = isAdmin ? hostChoice : currentUserId;
   const nameOf = useMemo(() => {
@@ -127,6 +172,13 @@ export function GuestForm({
   function problem(at: number): string | null {
     if (at === 0 && guestName.trim().length < 2) return "Enter the guest’s name.";
     if (at === 1 && !/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) return "Choose a date.";
+    if (at === 1 && wantsRoom && !time) return "Choose an expected time so the room can be booked.";
+    if (at === 1 && wantsRoom && !chosenRoomId) {
+      return roomsLoading ? "Meeting rooms are still loading." : `${roomDay?.error ?? "No meeting rooms are available."} Turn off room booking to continue.`;
+    }
+    if (at === 2 && wantsRoom && isAdmin && hostChoice === OTHER_HOST) {
+      return "A room can only be booked for a host with an account. Choose someone from the list, or turn off room booking.";
+    }
     if (at === 2 && isAdmin && hostChoice === OTHER_HOST && hostName.trim().length < 2) return "Enter the host’s name.";
     return null;
   }
@@ -180,6 +232,8 @@ export function GuestForm({
         licensePlate: byCar ? plate : "",
         vehicle: byCar ? vehicle : "",
         notifyUserIds: notifyList,
+        // When the floor doesn't offer booking, any existing booking just follows the visit.
+        booking: roomBooking ? (wantsRoom ? { roomId: chosenRoomId, minutes } : null) : undefined,
       });
       if (!result.ok) {
         setError(result.error);
@@ -187,7 +241,7 @@ export function GuestForm({
       }
       savedDate.current = visitDate;
       router.refresh();
-      onSaved(name, isNew);
+      onSaved(name, isNew, result.booking);
       if (another && isNew) {
         // Saved: open a new, empty form for the next guest.
         setGuestName("");
@@ -201,8 +255,12 @@ export function GuestForm({
         setByCar(false);
         setPlate("");
         setVehicle("");
+        setBookRoom(false);
+        setRoomId("");
+        setMinutes(60);
         setAdded((n) => n + 1);
         setStep(0);
+        if (result.booking?.kind === "taken" || result.booking?.kind === "failed") setError(result.booking.message);
         return;
       }
       close();
@@ -211,7 +269,7 @@ export function GuestForm({
 
   const answers = [
     guestName.trim() ? `${guestName.trim()}${company.trim() ? ` · ${company.trim()}` : ""}` : "",
-    `${visitDate === today ? "Today" : longDate(visitDate)} · ${time ? timeLabel(time) : "Any time"}`,
+    `${visitDate === today ? "Today" : longDate(visitDate)} · ${time ? timeLabel(time) : "Any time"}${wantsRoom ? " · Room" : ""}`,
     `${hostId === currentUserId ? "You" : hostChoice === OTHER_HOST ? hostName.trim() || "Someone else" : nameOf(hostChoice)}${
       notifyList.length ? ` · +${notifyList.length} notified` : ""
     }`,
@@ -406,6 +464,20 @@ export function GuestForm({
                   ))}
                 </div>
               </div>
+              {roomBooking ? (
+                <RoomSection
+                  on={bookRoom}
+                  onToggle={setBookRoom}
+                  loading={roomsLoading}
+                  error={roomDay?.date === visitDate ? roomDay.error : null}
+                  rooms={rooms}
+                  selected={selectedRoom}
+                  onSelect={setRoomId}
+                  minutes={minutes}
+                  onMinutes={setMinutes}
+                  time={time}
+                />
+              ) : null}
             </>
           ) : null}
 
@@ -521,6 +593,12 @@ export function GuestForm({
                   {longDate(visitDate)}
                 </p>
                 <p className="text-sm text-muted">{time ? timeLabel(time) : "Any time"}</p>
+                {wantsRoom ? (
+                  <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-ink-soft">
+                    <BuildingIcon className="size-4 text-muted" />
+                    {selectedRoom?.name ?? guest?.booking?.roomName ?? "Meeting room"} · {lengthLabel(minutes)}
+                  </p>
+                ) : null}
               </ReviewCard>
               <ReviewCard icon={<BellIcon className="size-5" />} label="Host and alerts" onEdit={() => goTo(2)}>
                 <p className="font-medium">
@@ -555,6 +633,99 @@ function chip(on: boolean) {
   return `inline-flex h-9 items-center rounded-full border px-3.5 text-sm transition-colors ${
     on ? "border-signal bg-signal-soft font-semibold text-signal-deep" : "border-line-strong bg-panel hover:border-ink"
   }`;
+}
+
+/** "Book a meeting room": the room, how long, and what's already taken that day. */
+function RoomSection({
+  on,
+  onToggle,
+  loading,
+  error,
+  rooms,
+  selected,
+  onSelect,
+  minutes,
+  onMinutes,
+  time,
+}: {
+  on: boolean;
+  onToggle: (on: boolean) => void;
+  loading: boolean;
+  error: string | null;
+  rooms: RoomOption[];
+  selected: RoomOption | null;
+  onSelect: (id: string) => void;
+  minutes: number;
+  onMinutes: (minutes: number) => void;
+  time: string;
+}) {
+  const lengths = [...new Set<number>([...BOOKING_LENGTHS, minutes])].sort((a, b) => a - b);
+  const start = time ? clockMinutes(time) : null;
+  const clash =
+    start !== null
+      ? selected?.busy.find((slot) => clockMinutes(slot.from) < start + minutes && clockMinutes(slot.to) > start)
+      : undefined;
+
+  return (
+    <div className="rounded-xl border border-line">
+      <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5">
+        <input type="checkbox" className="size-4 accent-[var(--ink)]" checked={on} onChange={(e) => onToggle(e.target.checked)} />
+        <BuildingIcon className="size-5 text-muted" />
+        <span className="flex-1">
+          <span className="block text-sm font-semibold">Book a meeting room</span>
+          <span className="block text-xs text-muted">Starts at the expected time, under the host’s name.</span>
+        </span>
+      </label>
+      {on ? (
+        <div className="grid gap-3 border-t border-line p-3">
+          {loading ? <p className="text-sm text-muted">Checking the rooms…</p> : null}
+          {error ? <Alert>{error}</Alert> : null}
+          {rooms.length > 1 ? (
+            <div>
+              <p className="label">Room</p>
+              <div className="flex flex-wrap gap-2">
+                {rooms.map((room) => (
+                  <button key={room.id} type="button" className={chip(room.id === selected?.id)} onClick={() => onSelect(room.id)}>
+                    {room.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {selected ? (
+            <p className="text-sm">
+              <span className="font-semibold">{selected.name}</span>
+              <span className="text-muted">
+                {selected.location ? ` · ${selected.location}` : ""}
+                {selected.capacity ? ` · Seats ${selected.capacity}` : ""}
+              </span>
+            </p>
+          ) : null}
+          <div>
+            <p className="label">How long?</p>
+            <div className="flex flex-wrap gap-2">
+              {lengths.map((length) => (
+                <button key={length} type="button" className={chip(length === minutes)} onClick={() => onMinutes(length)}>
+                  {lengthLabel(length)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {selected ? (
+            <p className="text-sm text-muted">
+              {selected.busy.length ? `Taken this day: ${selected.busy.map((slot) => slot.label).join(", ")}` : "Free all day."}
+            </p>
+          ) : null}
+          {!time ? <p className="text-sm font-medium text-expected">Choose an expected time to book the room.</p> : null}
+          {clash && selected ? (
+            <Alert>
+              {selected.name} is taken from {clash.label}. Choose another time or a shorter meeting.
+            </Alert>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function HostRadio({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (id: string) => void }) {

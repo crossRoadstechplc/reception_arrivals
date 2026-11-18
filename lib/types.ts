@@ -14,9 +14,27 @@ export const GUEST_STATUSES = [
 ] as const;
 export type GuestStatus = (typeof GUEST_STATUSES)[number];
 
+/** What happened to the meeting room when a guest was saved. */
+export type BookingOutcome = {
+  kind: "booked" | "taken" | "failed" | "cancelled";
+  message: string;
+};
+
 export type ActionResult =
-  | { ok: true; notice?: string }
+  | { ok: true; notice?: string; booking?: BookingOutcome }
   | { ok: false; error: string };
+
+/** A meeting room and the times already taken on one day. */
+export type RoomOption = {
+  id: string;
+  name: string;
+  location: string | null;
+  capacity: number | null;
+  busy: { from: string; to: string; label: string }[];
+};
+
+/** Meeting lengths offered on the guest form, in minutes. */
+export const BOOKING_LENGTHS = [30, 60, 120] as const;
 
 export const ROLE_LABEL: Record<Role, string> = {
   RECEPTION: "Reception",

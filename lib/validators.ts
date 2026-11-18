@@ -18,6 +18,14 @@ export const guestInputSchema = z.object({
   vehicle: z.string().trim().max(80).optional().or(z.literal("")),
   /** "Also notify": colleagues on the floor told about the visit. */
   notifyUserIds: z.array(z.string().min(1).max(64)).max(25, "That's too many people to notify").optional(),
+  /** Meeting room: details to book, null for no room, left out to keep any booking in step with the visit. */
+  booking: z
+    .object({
+      roomId: z.string().uuid("Choose a meeting room"),
+      minutes: z.number().int().min(15, "Choose a meeting length").max(480, "Choose a shorter meeting"),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const floorInputSchema = z.object({

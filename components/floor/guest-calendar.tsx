@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { timeOfDayMinutes } from "@/lib/dates";
-import { FLOOR_ROLE_LABEL, type FloorRole } from "@/lib/types";
+import { FLOOR_ROLE_LABEL, type BookingOutcome, type FloorRole } from "@/lib/types";
 import { GuestForm } from "@/components/floor/guest-form";
+import { RoomLine } from "@/components/floor/room-line";
 import type { FloorGuest, HostOption } from "@/components/floor/guest-manager";
-import { EmptyState, MissedBadge, Modal, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
+import { Alert, EmptyState, MissedBadge, Modal, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
 import { LiveIndicator, useBackToToday, useLiveRefresh } from "@/components/use-live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
 import { PushPrompt } from "@/components/push-prompt";
@@ -15,7 +16,7 @@ import { BuildingIcon, CarIcon, CheckIcon, ChevronLeft, ChevronRight, NoteIcon, 
 export type CalendarView = "day" | "week";
 
 type Day = { iso: string; label: string; weekday: string; day: number; month: string; year: number };
-type FloorOption = { id: string; name: string; number: number; role: FloorRole };
+type FloorOption = { id: string; name: string; number: number; role: FloorRole; roomBookingOn: boolean };
 type Kind = "exp" | "late" | "in" | "gone";
 
 /** Pixels per hour on the time grid. */
@@ -110,6 +111,7 @@ export function GuestCalendar({
   const [open, setOpen] = useState<FloorGuest | null>(null);
   const [editing, setEditing] = useState<FloorGuest | "new" | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const [roomProblem, setRoomProblem] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState({ base: officeMinutes, minutes: 0 });
 
   const floor = floors.find((f) => f.id === floorId);
@@ -172,6 +174,11 @@ export function GuestCalendar({
     picked && byDay.has(picked) ? picked : byDay.has(date) ? date : byDay.has(today) ? today : days[0]?.iso;
   const addDate = focusDay && focusDay >= today ? focusDay : today;
 
+  function announce(message: string, booking?: BookingOutcome) {
+    if (booking?.kind === "taken" || booking?.kind === "failed") setRoomProblem(booking.message);
+    show({ message: booking?.kind === "booked" || booking?.kind === "cancelled" ? `${message}. ${booking.message}` : message });
+  }
+
   const heading = isAdmin ? (floor?.name ?? "Calendar") : `My guests${floor ? ` · ${floor.name}` : ""}`;
   const helpers = { kindOf, onOpen: setOpen };
 
@@ -213,6 +220,8 @@ export function GuestCalendar({
       ) : (
         <>
           <PushPrompt />
+
+          {roomProblem ? <Alert onClose={() => setRoomProblem(null)}>{roomProblem}</Alert> : null}
 
           {/* Controls */}
           <section className="flex flex-wrap items-center gap-2">
@@ -356,9 +365,10 @@ export function GuestCalendar({
           currentUserId={currentUserId}
           hosts={hosts}
           people={people}
+          roomBooking={floor?.roomBookingOn ?? false}
           guest={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
-          onSaved={(name, isNew) => show({ message: isNew ? `${name} added` : `${name} updated` })}
+          onSaved={(name, isNew, booking) => announce(isNew ? `${name} added` : `${name} updated`, booking)}
           onShowDate={(saved) => {
             if (!days.some((day) => day.iso === saved)) visit({ date: saved });
           }}
@@ -918,6 +928,7 @@ function GuestDetails({
             </div>
           ) : null}
         </dl>
+        {guest.status === "CANCELLED" || guest.status === "NO_SHOW" ? null : <RoomLine booking={guest.booking} />}
         {hasCar(guest) ? (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel-2 px-3 py-2.5 text-sm">
             <CarIcon className="size-4 text-muted" />

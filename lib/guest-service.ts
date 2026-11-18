@@ -3,9 +3,18 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { isISODate, officeTodayISO, toDateOnly } from "@/lib/dates";
 import { notifyInviteesAdded } from "@/lib/notify";
-import { canEditGuest, floorRoleOf, type AppUser } from "@/lib/permissions";
+import { canEditGuest, canManageFloor, floorRoleOf, type AppUser } from "@/lib/permissions";
 import { notifyGuestsChanged } from "@/lib/realtime";
-import { OTHER_HOST, type ActionResult } from "@/lib/types";
+import {
+  releaseGuestBooking,
+  restoreGuestBooking,
+  roomBookingAvailable,
+  roomBookingOn,
+  roomsForDay,
+  syncGuestBooking,
+  type BookingWanted,
+} from "@/lib/room-booking";
+import { OTHER_HOST, type ActionResult, type BookingOutcome, type RoomOption } from "@/lib/types";
 import { blankToNull, firstIssue, guestInputSchema } from "@/lib/validators";
 
 /**
@@ -27,7 +36,19 @@ export type SaveGuestInput = {
   vehicle?: string;
   /** "Also notify": colleagues on the floor to tell about the visit. Omit to leave as is. */
   notifyUserIds?: string[];
+  /** Meeting room: details to book, null for no room, omit to keep any booking in step with the visit. */
+  booking?: BookingWanted | null;
 };
+
+/** The guest is already saved here, so a booking problem must never become a save error. */
+async function bookingStep(step: () => Promise<BookingOutcome | undefined>): Promise<BookingOutcome | undefined> {
+  try {
+    return await step();
+  } catch (error) {
+    console.error("Room booking step failed", error);
+    return { kind: "failed", message: "The guest was saved, but the room could not be booked because of a server problem." };
+  }
+}
 
 export async function refreshBoards() {
   revalidatePath("/reception");
@@ -143,6 +164,8 @@ export async function saveGuestAs(user: AppUser, input: SaveGuestInput): Promise
     await db.guestInvitee.deleteMany({ where: { guestId, userId: hostUserId } });
   }
 
+  const booking = await bookingStep(() => syncGuestBooking(guestId, parsed.data.booking));
+
   await refreshBoards();
 
   // Tell newly added people about the visit (not for past dates).
@@ -151,7 +174,40 @@ export async function saveGuestAs(user: AppUser, input: SaveGuestInput): Promise
     const by = user.name || user.email || "A colleague";
     after(() => notifyInviteesAdded(id, added, by));
   }
-  return { ok: true };
+  return { ok: true, booking };
+}
+
+/** Meeting rooms and their taken times, for the guest form. */
+export async function roomsForFormAs(
+  user: AppUser,
+  input: { floorId: string; date: string; guestId?: string },
+): Promise<{ ok: true; rooms: RoomOption[] } | { ok: false; error: string }> {
+  if (!floorRoleOf(user, input.floorId)) return { ok: false, error: "You are not on that floor." };
+  if (!isISODate(input.date)) return { ok: false, error: "Choose a valid date." };
+  const floor = await db.floor.findFirst({ where: { id: input.floorId, active: true } });
+  if (!floor || !roomBookingOn(floor)) return { ok: false, error: "Room booking is turned off for this floor." };
+  // When editing, the guest's own booking doesn't count as taken.
+  const guest = input.guestId ? await db.guest.findUnique({ where: { id: input.guestId } }) : null;
+  const own = guest && canEditGuest(user, guest) ? guest.bookingId : null;
+  try {
+    return { ok: true, rooms: await roomsForDay(input.date, own) };
+  } catch (error) {
+    console.error("Meeting rooms could not be loaded", error);
+    return { ok: false, error: "Meeting rooms can't be loaded right now because of a server problem." };
+  }
+}
+
+/** The floor admin's switch for offering room booking on the guest form. */
+export async function setRoomBookingAs(user: AppUser, floorId: string, enabled: boolean): Promise<ActionResult> {
+  if (!canManageFloor(user, floorId)) return { ok: false, error: "Only a floor admin can change this." };
+  const floor = await db.floor.findFirst({ where: { id: floorId, active: true } });
+  if (!floor) return { ok: false, error: "That floor is not active." };
+  if (!roomBookingAvailable(floor)) return { ok: false, error: "This floor isn't connected to a booking system yet." };
+  await db.floor.update({ where: { id: floor.id }, data: { roomBookingEnabled: enabled } });
+  revalidatePath("/floor");
+  revalidatePath("/floor/calendar");
+  revalidatePath("/floor/team");
+  return { ok: true, notice: enabled ? "Room booking is on" : "Room booking is off" };
 }
 
 export async function setFloorGuestStatusAs(
@@ -168,8 +224,11 @@ export async function setFloorGuestStatusAs(
     return { ok: false, error: "Reception already cleared this guest." };
   }
   await db.guest.update({ where: { id: guest.id }, data: { status } });
+  const booking = await bookingStep(() =>
+    status === "CANCELLED" ? releaseGuestBooking(guest.id) : restoreGuestBooking(guest.id),
+  );
   await refreshBoards();
-  return { ok: true };
+  return { ok: true, booking };
 }
 
 /** Permanently removes a cancelled or no-show guest. Cleared guests stay as a record. */
@@ -182,6 +241,7 @@ export async function deleteGuestAs(user: AppUser, guestId: string): Promise<Act
   if (guest.status !== "CANCELLED" && guest.status !== "NO_SHOW") {
     return { ok: false, error: "Cancel the visit first, then delete it." };
   }
+  await bookingStep(() => releaseGuestBooking(guest.id));
   await db.guest.delete({ where: { id: guest.id } });
   await refreshBoards();
   return { ok: true };
