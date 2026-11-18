@@ -108,7 +108,7 @@ class _GuestSheetState extends State<_GuestSheet> {
       GuestKind.expected => AppColors.expected,
       GuestKind.late => AppColors.signalDeep,
       GuestKind.arrived => AppColors.cleared,
-      GuestKind.gone => AppColors.lineStrong,
+      GuestKind.gone || GuestKind.missed => AppColors.lineStrong,
     };
     final day = g.visitDate == loader.today ? 'Today, ${longDate(g.visitDate)}' : longDate(g.visitDate);
     final when = '$day · ${g.expectedLabel ?? 'Any time'}';
@@ -176,7 +176,9 @@ class _GuestSheetState extends State<_GuestSheet> {
                         Text(when, style: const TextStyle(color: AppColors.muted, fontSize: 14.5)),
                         const SizedBox(height: 8),
                         Row(
-                          children: [StatusBadge(guest: g, late: kind == GuestKind.late)],
+                          children: [
+                            StatusBadge(guest: g, late: kind == GuestKind.late, missed: kind == GuestKind.missed),
+                          ],
                         ),
                       ],
                     ),

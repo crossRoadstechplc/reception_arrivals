@@ -1,9 +1,9 @@
 import 'dart:math' as math;
-import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../brand.dart';
 import '../theme.dart';
 
 /// Animated start screen, shown while the app restores the sign-in.
@@ -93,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           width: 132,
                           height: 132,
                           child: CustomPaint(
-                            painter: _LogoPainter(strokes: strokes.value, underline: underline.value),
+                            painter: BrandLogoPainter(strokes: strokes.value, underline: underline.value),
                           ),
                         ),
                       ),
@@ -144,52 +144,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       ),
     );
   }
-}
-
-/// The logo's "A", drawn stroke by stroke, then its underline.
-class _LogoPainter extends CustomPainter {
-  _LogoPainter({required this.strokes, required this.underline});
-  final double strokes;
-  final double underline;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width / 64;
-    canvas.scale(s);
-    Paint pen(double width, [double alpha = 1]) => Paint()
-      ..color = Colors.white.withValues(alpha: alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // Underline sweeps out from the middle.
-    if (underline > 0) {
-      final half = 18 * underline;
-      canvas.drawLine(Offset(32 - half, 50), Offset(32 + half, 50), pen(4, 0.6));
-    }
-
-    // The two legs (one path), then the crossbar.
-    final legs = Path()
-      ..moveTo(20, 43)
-      ..lineTo(32, 18)
-      ..lineTo(44, 43);
-    final bar = Path()
-      ..moveTo(25.5, 34)
-      ..lineTo(38.5, 34);
-    _drawPartial(canvas, legs, (strokes / 0.75).clamp(0, 1), pen(5.5));
-    _drawPartial(canvas, bar, ((strokes - 0.7) / 0.3).clamp(0, 1), pen(5));
-  }
-
-  void _drawPartial(Canvas canvas, Path path, double t, Paint paint) {
-    if (t <= 0) return;
-    for (final PathMetric metric in path.computeMetrics()) {
-      canvas.drawPath(metric.extractPath(0, metric.length * t), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_LogoPainter old) => old.strokes != strokes || old.underline != underline;
 }
 
 /// Three soft rings expanding from the centre, like an arrival chime.

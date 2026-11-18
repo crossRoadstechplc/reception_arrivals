@@ -28,6 +28,16 @@ class Floor {
   final String role;
 
   bool get isAdmin => role == 'ADMIN';
+  String get roleLabel => isAdmin ? 'Floor admin' : 'Floor staff';
+
+  /// "6th Floor" from "6th Floor · SPX".
+  String get floorName => name.split(' · ').first;
+
+  /// "SPX" from "6th Floor · SPX", or null when the floor has no company set.
+  String? get company {
+    final at = name.indexOf(' · ');
+    return at < 0 ? null : name.substring(at + 3);
+  }
 
   factory Floor.fromJson(Map<String, dynamic> json) => Floor(
     id: json['id'] as String,
@@ -44,7 +54,7 @@ class Host {
   factory Host.fromJson(Map<String, dynamic> json) => Host(id: json['id'] as String, name: json['name'] as String);
 }
 
-enum GuestKind { expected, late, arrived, gone }
+enum GuestKind { expected, late, arrived, gone, missed }
 
 class Guest {
   Guest({
@@ -114,6 +124,8 @@ class Guest {
   GuestKind kind({required String today, required int nowMinutes}) {
     if (checkedIn) return GuestKind.arrived;
     if (notComing) return GuestKind.gone;
+    // The day has passed and reception never checked them in.
+    if (visitDate.compareTo(today) < 0) return GuestKind.missed;
     final expected = expectedMinutes;
     if (visitDate == today && expected != null && expected < nowMinutes) return GuestKind.late;
     return GuestKind.expected;

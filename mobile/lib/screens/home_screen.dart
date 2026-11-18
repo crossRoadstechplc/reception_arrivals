@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../theme.dart';
 import '../widgets.dart';
 import 'calendar_screen.dart';
 import 'guests_screen.dart';
@@ -42,8 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         return Scaffold(
-          // The Calendar tab draws its own calendar-style top bar.
-          appBar: _tab == 1 ? null : AppBar(titleSpacing: 16, title: _FloorTitle()),
+          // Guests shows the floor in its banner and Calendar has its own top bar.
+          appBar: _tab == 2 ? AppBar(titleSpacing: 16, title: const Text('Settings')) : null,
           body: IndexedStack(
             index: _tab,
             children: [
@@ -75,50 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-/// Floor name (and company), with a switcher when the person works on several floors.
-class _FloorTitle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final floor = session.floor!;
-    final title = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          floor.isAdmin ? 'FLOOR ADMIN' : 'MY GUESTS',
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.4,
-            color: AppColors.signal,
-          ),
-        ),
-        Text(
-          floor.name,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-    if (session.floors.length < 2) return title;
-    return PopupMenuButton<String>(
-      tooltip: 'Switch floor',
-      onSelected: session.selectFloor,
-      itemBuilder: (context) => [
-        for (final f in session.floors)
-          CheckedPopupMenuItem(value: f.id, checked: f.id == floor.id, child: Text('${f.number} · ${f.name}')),
-      ],
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(child: title),
-          const Icon(Icons.arrow_drop_down),
-        ],
-      ),
     );
   }
 }

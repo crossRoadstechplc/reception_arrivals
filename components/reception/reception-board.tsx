@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { setDeskNote, setReceptionStatus } from "@/lib/actions/guests";
 import { timeOfDayMinutes } from "@/lib/dates";
 import { type GuestStatus } from "@/lib/types";
-import { Alert, DateHeading, DateNav, Drawer, EmptyState, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
-import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
+import { Alert, DateHeading, DateNav, Drawer, EmptyState, MissedBadge, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
+import { LiveIndicator, useBackToToday, useLiveRefresh } from "@/components/use-live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
 import { CarIcon, CheckIcon, NoteIcon, PencilIcon, SearchIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
@@ -82,6 +82,7 @@ export function ReceptionBoard({
 }) {
   const router = useRouter();
   const live = useLiveRefresh();
+  useBackToToday(date, today, () => go(today));
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("expected");
@@ -361,6 +362,7 @@ export function ReceptionBoard({
                 key={guest.id}
                 guest={guest}
                 late={isLate(guest)}
+                missed={date < today && guest.status === "EXPECTED"}
                 pending={pendingId === guest.id}
                 flash={flashId === guest.id}
                 onOpen={() => setSelectedId(guest.id)}
@@ -381,6 +383,7 @@ export function ReceptionBoard({
           key={selected.id}
           guest={selected}
           late={isLate(selected)}
+          missed={date < today && selected.status === "EXPECTED"}
           pending={pendingId === selected.id}
           onClose={() => setSelectedId(null)}
           onCheckIn={() => checkIn(selected)}
@@ -399,6 +402,7 @@ export function ReceptionBoard({
 function VisitorRow({
   guest,
   late,
+  missed,
   pending,
   flash,
   onOpen,
@@ -406,6 +410,7 @@ function VisitorRow({
 }: {
   guest: BoardGuest;
   late: boolean;
+  missed: boolean;
   pending: boolean;
   flash: boolean;
   onOpen: () => void;
@@ -434,7 +439,7 @@ function VisitorRow({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <button
               type="button"
-              className="truncate text-left text-base font-semibold tracking-tight group-hover:underline"
+              className={`truncate text-left text-base font-semibold tracking-tight group-hover:underline ${missed ? "text-muted line-through" : ""}`}
               onClick={(event) => {
                 event.stopPropagation();
                 onOpen();
@@ -443,6 +448,7 @@ function VisitorRow({
               {guest.guestName}
             </button>
             {tab === "gone" ? <StatusBadge status={guest.status} /> : null}
+            {missed ? <MissedBadge /> : null}
             {guest.notes ? (
               <span className="text-expected" title={`Note from floor: ${guest.notes}`}>
                 <NoteIcon className="size-4" />
@@ -562,6 +568,7 @@ const PERSON_ALERT: Record<string, string> = {
 function VisitorPanel({
   guest,
   late,
+  missed,
   pending,
   onClose,
   onCheckIn,
@@ -570,6 +577,7 @@ function VisitorPanel({
 }: {
   guest: BoardGuest;
   late: boolean;
+  missed: boolean;
   pending: boolean;
   onClose: () => void;
   onCheckIn: () => void;
@@ -609,8 +617,8 @@ function VisitorPanel({
       title={
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">{guest.guestName}</h2>
-            <StatusBadge status={guest.status} />
+            <h2 className={`text-xl font-semibold tracking-tight ${missed ? "text-muted line-through" : ""}`}>{guest.guestName}</h2>
+            {missed ? <MissedBadge /> : <StatusBadge status={guest.status} />}
             {late ? <span className="badge bg-signal-soft text-signal-deep">Late</span> : null}
           </div>
           {guest.company ? <p className="mt-0.5 text-sm text-muted">{guest.company}</p> : null}

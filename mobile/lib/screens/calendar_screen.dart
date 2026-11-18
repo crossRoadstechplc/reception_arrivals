@@ -44,7 +44,7 @@ class _Look {
     GuestKind.expected => const _Look(AppColors.expected, Colors.white, false),
     GuestKind.late => const _Look(AppColors.signalDeep, Colors.white, false),
     GuestKind.arrived => const _Look(AppColors.clearedSoft, AppColors.clearedInk, true),
-    GuestKind.gone => const _Look(AppColors.idleSoft, AppColors.idle, true),
+    GuestKind.gone || GuestKind.missed => const _Look(AppColors.idleSoft, AppColors.idle, true),
   };
 
   TextStyle text(double size, {FontWeight weight = FontWeight.w500}) => TextStyle(
@@ -77,6 +77,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   CalView _view = CalView.schedule;
   late String _anchor;
   late final GuestLoader _loader;
+  late final TodayKeeper _keeper;
   bool _pickerOpen = false;
   late String _pickerMonth;
   bool _showArrived = true;
@@ -90,13 +91,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _pickerMonth = _anchor;
     final (from, to) = _range();
     _loader = GuestLoader(from: from, to: to);
-    var trusted = session.today != null;
-    _loader.addListener(() {
-      final serverToday = _loader.data?.today;
-      if (trusted || serverToday == null) return;
-      trusted = true;
-      if (serverToday != _anchor) _go(serverToday);
-    });
+    _keeper = TodayKeeper(loader: _loader, current: () => _anchor, goToday: _go);
+    _loader.addListener(_keeper.check);
     _restorePrefs();
   }
 
@@ -133,6 +129,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _go(String anchor, {CalView? view}) {
+    _keeper.moved();
     setState(() {
       _anchor = anchor;
       _pickerMonth = anchor;
@@ -175,7 +172,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   /// Guests on a day after the Show filters.
   List<Guest> _on(String iso) => _loader.on(iso).where((g) {
     if (!_showArrived && g.checkedIn) return false;
-    if (!_showGone && g.notComing) return false;
+    if (!_showGone && (g.notComing || _kind(g) == GuestKind.missed)) return false;
     if (_onlyMine && !g.mine) return false;
     return true;
   }).toList()..sort((a, b) => (a.expectedMinutes ?? -1).compareTo(b.expectedMinutes ?? -1));
@@ -588,7 +585,7 @@ class _CalendarDrawer extends StatelessWidget {
               (v) => state._setFilter(_CalendarScreenState._arrivedKey, v, (x) => state._showArrived = x),
             ),
             check(
-              'Cancelled and no-shows',
+              'Cancelled, no-shows and missed',
               state._showGone,
               AppColors.idle,
               (v) => state._setFilter(_CalendarScreenState._goneKey, v, (x) => state._showGone = x),
@@ -856,7 +853,10 @@ class _ScheduleChip extends StatelessWidget {
       guest.expectedLabel ?? 'Any time',
       if (kind == GuestKind.arrived && guest.checkedInLabel != null) 'arrived ${guest.checkedInLabel}',
       if (kind == GuestKind.gone) guest.status == 'NO_SHOW' ? 'no-show' : 'cancelled',
-      if (kind != GuestKind.arrived && kind != GuestKind.gone && (guest.company?.isNotEmpty ?? false)) guest.company!,
+      if (kind == GuestKind.missed) 'missed',
+      if (kind == GuestKind.expected || kind == GuestKind.late) ...[
+        if (guest.company?.isNotEmpty ?? false) guest.company!,
+      ],
     ];
     return Material(
       color: look.bg,
@@ -1196,6 +1196,7 @@ class _Block extends StatelessWidget {
         : [
             guest.expectedLabel ?? '',
             if (kind == GuestKind.late) 'late',
+            if (kind == GuestKind.missed) 'missed',
             if (kind == GuestKind.arrived && guest.checkedInLabel != null) 'arrived ${guest.checkedInLabel}',
             if (guest.company?.isNotEmpty ?? false) guest.company!,
             if (showHost) 'Host: ${guest.mine ? 'you' : guest.hostName}',
@@ -1468,7 +1469,7 @@ class _GuestSearch extends SearchDelegate<void> {
               minLeadingWidth: 12,
               title: Text(
                 g.guestName,
-                style: TextStyle(decoration: g.checkedIn || g.notComing ? TextDecoration.lineThrough : null),
+                style: TextStyle(decoration: KindStyle.struck(state._kind(g)) ? TextDecoration.lineThrough : null),
               ),
               subtitle: Text(
                 [

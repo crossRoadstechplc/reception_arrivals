@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
 export type LiveState = "connecting" | "live" | "offline";
 
 const FALLBACK_POLL_MS = 30_000;
+const DAY_CHECK_MS = 5 * 60_000;
+const BACK_TO_TODAY_MS = 10 * 60_000;
 
 /**
  * Refreshes server data when any guest changes. Uses the Supabase broadcast
@@ -43,7 +45,33 @@ export function useLiveRefresh() {
     return () => window.clearInterval(timer);
   }, [live, router]);
 
+  // Live updates only fire when guests change, so also catch a new day: on return to the tab and every few minutes.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(refresh, DAY_CHECK_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.clearInterval(timer);
+    };
+  }, [router]);
+
   return live;
+}
+
+/** Someone left looking at another date is brought back to today after a while. */
+export function useBackToToday(date: string, today: string, goToday: () => void) {
+  const go = useRef(goToday);
+  useEffect(() => {
+    go.current = goToday;
+  });
+  useEffect(() => {
+    if (date === today) return;
+    const timer = window.setTimeout(() => go.current(), BACK_TO_TODAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [date, today]);
 }
 
 export function LiveIndicator({ live }: { live: LiveState }) {

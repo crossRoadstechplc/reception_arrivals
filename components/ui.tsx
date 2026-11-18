@@ -32,6 +32,16 @@ export function StatusBadge({ status }: { status: GuestStatus }) {
   );
 }
 
+/** An expected guest whose day passed without checking in. */
+export function MissedBadge() {
+  return (
+    <span className="badge bg-idle-soft text-idle">
+      <span className="size-1.5 rounded-full bg-idle" />
+      Missed
+    </span>
+  );
+}
+
 /* ---------- Empty state ---------- */
 
 export function EmptyState({

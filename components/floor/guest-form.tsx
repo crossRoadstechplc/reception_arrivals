@@ -179,8 +179,13 @@ export function GuestForm({
       router.refresh();
       onSaved(name, isNew);
       if (another && isNew) {
-        // Keep date, host, company and "Also notify"; start the next guest.
+        // Saved: open a new, empty form for the next guest.
         setGuestName("");
+        setCompany("");
+        setVisitDate(date);
+        setHostChoice(currentUserId);
+        setHostName("");
+        setNotify([]);
         setTime("");
         setNotes("");
         setByCar(false);
@@ -217,7 +222,7 @@ export function GuestForm({
             </button>
             {isNew ? (
               <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => save(true)}>
-                Save &amp; add another
+                Save and Add more Guests
               </button>
             ) : null}
             <button type="button" className="btn btn-primary" disabled={pending} onClick={() => save(false)}>

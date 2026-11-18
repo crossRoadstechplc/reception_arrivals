@@ -110,3 +110,30 @@ class GuestLoader extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// Brings a screen back to today: straight away when the office day changes, and
+/// after [idle] when someone was left looking at another date.
+class TodayKeeper {
+  TodayKeeper({required this.loader, required this.current, required this.goToday}) : _lastToday = session.today;
+
+  static const idle = Duration(minutes: 10);
+
+  final GuestLoader loader;
+  final String Function() current;
+  final void Function(String today) goToday;
+  String? _lastToday;
+  DateTime _moved = DateTime.now();
+
+  /// Call when the person moves to another date.
+  void moved() => _moved = DateTime.now();
+
+  /// Runs after every load: every 30 seconds, and when the app comes back to the front.
+  void check() {
+    final today = loader.data?.today;
+    if (today == null) return;
+    final newDay = today != _lastToday;
+    _lastToday = today;
+    if (current() == today) return;
+    if (newDay || DateTime.now().difference(_moved) >= idle) goToday(today);
+  }
+}

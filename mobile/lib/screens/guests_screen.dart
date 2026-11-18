@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../brand.dart';
 import '../dates.dart';
 import '../guest_loader.dart';
 import '../main.dart';
@@ -20,20 +22,15 @@ class GuestsScreen extends StatefulWidget {
 class _GuestsScreenState extends State<GuestsScreen> {
   late String _date;
   late final GuestLoader _loader;
+  late final TodayKeeper _keeper;
 
   @override
   void initState() {
     super.initState();
     _date = session.today ?? isoFromDate(DateTime.now());
     _loader = GuestLoader(from: _date, to: _date);
-    // If we had to guess "today" from the phone, switch to the office's today once the server answers.
-    var trusted = session.today != null;
-    _loader.addListener(() {
-      final serverToday = _loader.data?.today;
-      if (trusted || serverToday == null) return;
-      trusted = true;
-      if (serverToday != _date) _go(serverToday);
-    });
+    _keeper = TodayKeeper(loader: _loader, current: () => _date, goToday: _go);
+    _loader.addListener(_keeper.check);
   }
 
   @override
@@ -43,6 +40,7 @@ class _GuestsScreenState extends State<GuestsScreen> {
   }
 
   void _go(String date) {
+    _keeper.moved();
     setState(() => _date = date);
     _loader.setRange(date, date);
   }
@@ -78,9 +76,10 @@ class _GuestsScreenState extends State<GuestsScreen> {
           final now = _loader.nowMinutes;
           final guests = _loader.on(_date);
           final isAdmin = session.floor?.isAdmin ?? false;
-          final toCome = guests.where((g) => g.status == 'EXPECTED').toList();
+          bool missed(Guest g) => g.kind(today: today, nowMinutes: now) == GuestKind.missed;
+          final toCome = guests.where((g) => g.status == 'EXPECTED' && !missed(g)).toList();
           final checkedIn = guests.where((g) => g.checkedIn).toList();
-          final gone = guests.where((g) => g.notComing).toList();
+          final gone = guests.where((g) => g.notComing || missed(g)).toList();
 
           Widget section(String title, List<Guest> list, Color color) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,70 +103,112 @@ class _GuestsScreenState extends State<GuestsScreen> {
             ],
           );
 
-          return RefreshIndicator(
-            onRefresh: () => _loader.load(quiet: true),
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-              children: [
-                Panel(
-                  child: Column(
-                    children: [
-                      _DateBar(
-                        label: friendlyDate(_date, today),
-                        sub: _date == today ? longDate(_date) : null,
-                        isToday: _date == today,
-                        onPrev: () => _go(addDays(_date, -1)),
-                        onNext: () => _go(addDays(_date, 1)),
-                        onToday: () => _go(today),
-                        onPick: _pickDate,
-                      ),
-                      const RowDivider(indent: 0),
-                      IntrinsicHeight(
-                        child: Row(
-                          children: [
-                            _Stat(count: toCome.length, label: 'To come', color: AppColors.expected),
-                            const VerticalDivider(width: 1, color: AppColors.line),
-                            _Stat(count: checkedIn.length, label: 'Checked in', color: AppColors.cleared),
-                            const VerticalDivider(width: 1, color: AppColors.line),
-                            _Stat(count: gone.length, label: 'Not coming', color: AppColors.idle),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_loader.error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: ErrorBanner(message: _loader.error!, onRetry: _loader.load),
-                  ),
-                if (_loader.data == null && _loader.loading)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 64),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (guests.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Panel(
-                      child: EmptyMessage(
-                        icon: Icons.person_outline,
-                        title: 'No guests on this day',
-                        body: isAdmin ? 'Add the guests your floor is expecting.' : 'Add the guests you’re expecting.',
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+            child: SafeArea(
+              bottom: false,
+              child: RefreshIndicator(
+                onRefresh: () => _loader.load(quiet: true),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                  children: [
+                    const _FloorBanner(),
+                    const SizedBox(height: 12),
+                    Panel(
+                      child: Column(
+                        children: [
+                          _DateBar(
+                            label: friendlyDate(_date, today),
+                            sub: _date == today ? longDate(_date) : null,
+                            isToday: _date == today,
+                            onPrev: () => _go(addDays(_date, -1)),
+                            onNext: () => _go(addDays(_date, 1)),
+                            onToday: () => _go(today),
+                            onPick: _pickDate,
+                          ),
+                          const RowDivider(indent: 0),
+                          IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                _Stat(count: toCome.length, label: 'To come', color: AppColors.expected),
+                                const VerticalDivider(width: 1, color: AppColors.line),
+                                _Stat(count: checkedIn.length, label: 'Checked in', color: AppColors.cleared),
+                                const VerticalDivider(width: 1, color: AppColors.line),
+                                _Stat(count: gone.length, label: 'Not coming', color: AppColors.idle),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  )
-                else ...[
-                  if (toCome.isNotEmpty) section('Still to come', toCome, AppColors.expected),
-                  if (checkedIn.isNotEmpty) section('Checked in', checkedIn, AppColors.cleared),
-                  if (gone.isNotEmpty) section('Not coming', gone, AppColors.muted),
-                ],
-              ],
+                    if (_loader.error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: ErrorBanner(message: _loader.error!, onRetry: _loader.load),
+                      ),
+                    if (_loader.data == null && _loader.loading)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 64),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (guests.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Panel(
+                          child: EmptyMessage(
+                            icon: Icons.person_outline,
+                            title: 'No guests on this day',
+                            body: isAdmin
+                                ? 'Add the guests your floor is expecting.'
+                                : 'Add the guests you’re expecting.',
+                          ),
+                        ),
+                      )
+                    else ...[
+                      if (toCome.isNotEmpty) section('Still to come', toCome, AppColors.expected),
+                      if (checkedIn.isNotEmpty) section('Checked in', checkedIn, AppColors.cleared),
+                      if (gone.isNotEmpty) section('Not coming', gone, AppColors.muted),
+                    ],
+                  ],
+                ),
+              ),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+/// Arrival Desk, then this floor and its company. Tap to switch floors if you're on several.
+class _FloorBanner extends StatelessWidget {
+  const _FloorBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: session,
+      builder: (context, _) {
+        final floor = session.floor;
+        if (floor == null) return const SizedBox.shrink();
+        final company = floor.company;
+        final banner = BrandBanner(
+          headline: company == null ? floor.floorName : '${floor.floorName} · $company',
+          canSwitch: session.floors.length > 1,
+        );
+        if (session.floors.length < 2) return banner;
+        return PopupMenuButton<String>(
+          tooltip: 'Switch floor',
+          onSelected: session.selectFloor,
+          position: PopupMenuPosition.under,
+          itemBuilder: (context) => [
+            for (final f in session.floors)
+              CheckedPopupMenuItem(value: f.id, checked: f.id == floor.id, child: Text(f.name)),
+          ],
+          child: banner,
+        );
+      },
     );
   }
 }
@@ -271,7 +312,7 @@ class GuestRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gone = kind == GuestKind.gone;
+    final gone = kind == GuestKind.gone || kind == GuestKind.missed;
     final sub = [
       if (guest.company?.isNotEmpty ?? false) guest.company!,
       if (showHost && !guest.invited) guest.mine ? 'Host: you' : 'Host: ${guest.hostName}',
@@ -300,6 +341,10 @@ class GuestRow extends StatelessWidget {
       GuestKind.gone => Text(
         guest.status == 'NO_SHOW' ? 'No-show' : 'Cancelled',
         style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+      ),
+      GuestKind.missed => const Text(
+        'Missed',
+        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
       ),
       GuestKind.expected => null,
     };

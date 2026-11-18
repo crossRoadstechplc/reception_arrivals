@@ -70,6 +70,7 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
   bool _byCar = false;
   bool _busy = false;
   int _added = 0;
+  String? _lastSaved;
   String? _error;
 
   Guest? get g => widget.guest;
@@ -220,19 +221,23 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
       );
       if (!mounted) return;
       if (another) {
-        // Keep date, host, company and "Also notify"; start the next guest.
+        // Saved: open a new, empty form for the next guest.
         setState(() {
           _added++;
-          _name.clear();
-          _notes.clear();
-          _plate.clear();
-          _vehicle.clear();
+          _lastSaved = name;
+          for (final c in [_name, _company, _hostName, _plate, _vehicle, _notes]) {
+            c.clear();
+          }
           _byCar = false;
           _time = null;
+          _date = widget.date;
+          _host = _me;
+          _notify = [];
           _step = _Step.guest;
         });
-        showMessage(context, '$name added');
-        _nameFocus.requestFocus();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _nameFocus.requestFocus();
+        });
       } else {
         Navigator.of(context).pop(true);
       }
@@ -269,7 +274,11 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
   Widget build(BuildContext context) {
     final review = _step == _Step.review;
     return PopScope(
-      canPop: !_busy,
+      canPop: false,
+      // Android's back gesture also reports guests already saved, so the list refreshes.
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_busy) Navigator.of(context).pop(_added > 0);
+      },
       child: Scaffold(
         backgroundColor: AppColors.paper,
         appBar: AppBar(
@@ -314,103 +323,126 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
             ),
           ),
         ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        body: Column(
           children: [
-            if (_added > 0)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text('$_added added so far.', style: const TextStyle(color: AppColors.muted)),
-              ),
-            if (_answers.isNotEmpty && !review)
-              Wrap(
-                spacing: 14,
-                runSpacing: 6,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
                 children: [
-                  for (final a in _answers)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                  if (_lastSaved != null && _step == _Step.guest)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(color: AppColors.clearedSoft, borderRadius: BorderRadius.circular(12)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, size: 20, color: AppColors.cleared),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _added > 1 ? '$_lastSaved saved · $_added guests added' : '$_lastSaved saved',
+                              style: const TextStyle(color: AppColors.clearedInk, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_answers.isNotEmpty && !review)
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 6,
                       children: [
-                        const Icon(Icons.check, size: 15, color: AppColors.cleared),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(a, style: const TextStyle(fontSize: 13, color: AppColors.muted)),
-                        ),
+                        for (final a in _answers)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check, size: 15, color: AppColors.cleared),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(a, style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
+                  const SizedBox(height: 12),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween(begin: const Offset(0.04, 0), end: Offset.zero).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: KeyedSubtree(key: ValueKey(_step), child: _stepBody()),
+                  ),
+                  if (_error != null) ...[const SizedBox(height: 12), ErrorBanner(message: _error!)],
                 ],
               ),
-            const SizedBox(height: 12),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0.04, 0), end: Offset.zero).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: KeyedSubtree(key: ValueKey(_step), child: _stepBody()),
             ),
-            if (_error != null) ...[const SizedBox(height: 12), ErrorBanner(message: _error!)],
+            // In the body (not bottomNavigationBar) so it rides above the keyboard.
+            SafeArea(top: false, child: _actionBar(review)),
           ],
         ),
-        bottomNavigationBar: SafeArea(
-          child: Container(
-            decoration: const BoxDecoration(
-              color: AppColors.panel,
-              border: Border(top: BorderSide(color: AppColors.line)),
-            ),
-            padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
-            child: review
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FilledButton(
-                        onPressed: _busy ? null : () => _save(),
-                        style: FilledButton.styleFrom(shape: const StadiumBorder()),
-                        child: Text(_busy ? 'Saving…' : (_isNew ? 'Save guest' : 'Save changes')),
-                      ),
-                      if (_isNew) ...[
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: _busy ? null : () => _save(another: true),
-                          style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
-                          child: const Text('Save & add another'),
-                        ),
-                      ],
-                    ],
-                  )
-                : Row(
-                    children: [
-                      if (_step != _Step.guest)
-                        TextButton.icon(
-                          onPressed: () => _goTo(_Step.values[_step.index - 1]),
-                          icon: const Icon(Icons.chevron_left),
-                          label: const Text('Back'),
-                        ),
-                      const Spacer(),
-                      if (_step == _Step.extras)
-                        TextButton(
-                          onPressed: () => _goTo(_Step.review),
-                          style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-                          child: const Text('Skip'),
-                        ),
-                      const SizedBox(width: 6),
-                      FilledButton(
-                        onPressed: _next,
-                        style: FilledButton.styleFrom(
-                          shape: const StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(horizontal: 28),
-                        ),
-                        child: Text(_step == _Step.extras ? 'Review' : 'Next'),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
       ),
+    );
+  }
+
+  /// Back / Next, or the save buttons on the review step.
+  Widget _actionBar(bool review) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.panel,
+        border: Border(top: BorderSide(color: AppColors.line)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+      child: review
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton(
+                  onPressed: _busy ? null : () => _save(),
+                  style: FilledButton.styleFrom(shape: const StadiumBorder()),
+                  child: Text(_busy ? 'Saving…' : (_isNew ? 'Save guest' : 'Save changes')),
+                ),
+                if (_isNew) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _busy ? null : () => _save(another: true),
+                    style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                    child: const Text('Save and Add more Guests'),
+                  ),
+                ],
+              ],
+            )
+          : Row(
+              children: [
+                if (_step != _Step.guest)
+                  TextButton.icon(
+                    onPressed: () => _goTo(_Step.values[_step.index - 1]),
+                    icon: const Icon(Icons.chevron_left),
+                    label: const Text('Back'),
+                  ),
+                const Spacer(),
+                if (_step == _Step.extras)
+                  TextButton(
+                    onPressed: () => _goTo(_Step.review),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+                    child: const Text('Skip'),
+                  ),
+                const SizedBox(width: 6),
+                FilledButton(
+                  onPressed: _next,
+                  style: FilledButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                  ),
+                  child: Text(_step == _Step.extras ? 'Review' : 'Next'),
+                ),
+              ],
+            ),
     );
   }
 

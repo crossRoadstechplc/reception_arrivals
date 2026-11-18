@@ -6,8 +6,8 @@ import { timeOfDayMinutes } from "@/lib/dates";
 import { FLOOR_ROLE_LABEL, type FloorRole } from "@/lib/types";
 import { GuestForm } from "@/components/floor/guest-form";
 import type { FloorGuest, HostOption } from "@/components/floor/guest-manager";
-import { EmptyState, Modal, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
-import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
+import { EmptyState, MissedBadge, Modal, PlateTag, StatusBadge, Toast, useToast } from "@/components/ui";
+import { LiveIndicator, useBackToToday, useLiveRefresh } from "@/components/use-live-refresh";
 import { RefreshButton } from "@/components/refresh-button";
 import { PushPrompt } from "@/components/push-prompt";
 import { BuildingIcon, CarIcon, CheckIcon, ChevronLeft, ChevronRight, NoteIcon, PencilIcon, PlusIcon } from "@/components/icons";
@@ -105,6 +105,7 @@ export function GuestCalendar({
 }) {
   const router = useRouter();
   const live = useLiveRefresh();
+  useBackToToday(date, today, () => visit({ date: today }));
   const { toast, show, dismiss } = useToast();
   const [open, setOpen] = useState<FloorGuest | null>(null);
   const [editing, setEditing] = useState<FloorGuest | "new" | null>(null);
@@ -148,6 +149,7 @@ export function GuestCalendar({
   function kindOf(guest: FloorGuest): Kind {
     if (guest.status === "ARRIVED" || guest.status === "CLEARED") return "in";
     if (guest.status === "CANCELLED" || guest.status === "NO_SHOW") return "gone";
+    if (guest.visitDate < today) return "gone"; // their day passed without checking in
     const expected = timeOfDayMinutes(guest.expectedArrival);
     return guest.visitDate === today && expected !== null && expected < nowMinutes ? "late" : "exp";
   }
@@ -374,7 +376,7 @@ function Legend() {
     { label: "Expected", className: KIND_STYLE.exp },
     { label: "Late", className: KIND_STYLE.late },
     { label: "Arrived", className: KIND_STYLE.in, struck: true },
-    { label: "Cancelled / no-show", className: KIND_STYLE.gone, struck: true },
+    { label: "Cancelled / no-show / missed", className: KIND_STYLE.gone, struck: true },
   ];
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted">
@@ -399,7 +401,7 @@ function StatusLine({ guest, kind, long = false }: { guest: FloorGuest; kind: Ki
       </span>
     );
   }
-  if (kind === "gone") return <span className="font-semibold">{guest.status === "NO_SHOW" ? "No-show" : "Cancelled"}</span>;
+  if (kind === "gone") return <span className="font-semibold">{guest.status === "EXPECTED" ? "Missed" : guest.status === "NO_SHOW" ? "No-show" : "Cancelled"}</span>;
   if (kind === "late") return <span className="font-bold tracking-wide text-signal-deep">{long ? "LATE · not checked in yet" : "LATE"}</span>;
   return long ? <span className="font-semibold text-expected">Expected</span> : null;
 }
@@ -883,7 +885,7 @@ function GuestDetails({
     >
       <div className="grid gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={guest.status} />
+          {kind === "gone" && guest.status === "EXPECTED" ? <MissedBadge /> : <StatusBadge status={guest.status} />}
           {kind === "late" ? <span className="badge bg-signal-soft text-signal-deep">Late</span> : null}
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">

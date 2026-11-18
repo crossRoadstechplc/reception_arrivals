@@ -12,13 +12,14 @@ import {
   DateHeading,
   DateNav,
   EmptyState,
+  MissedBadge,
   StatTile,
   StatusBadge,
   Toast,
   useToast,
   PlateTag,
 } from "@/components/ui";
-import { LiveIndicator, useLiveRefresh } from "@/components/use-live-refresh";
+import { LiveIndicator, useBackToToday, useLiveRefresh } from "@/components/use-live-refresh";
 import { PushPrompt } from "@/components/push-prompt";
 import { BellIcon, BuildingIcon, CarIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, UndoIcon, UserIcon, XIcon } from "@/components/icons";
 
@@ -74,6 +75,7 @@ export function GuestManager({
 }) {
   const router = useRouter();
   const live = useLiveRefresh();
+  useBackToToday(date, today, () => visit({ date: today }));
   const [editing, setEditing] = useState<FloorGuest | null | "new">(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -232,6 +234,7 @@ export function GuestManager({
             <ul className="card divide-y divide-line overflow-hidden">
               {guests.map((guest) => {
                 const inactive = guest.status === "CANCELLED" || guest.status === "NO_SHOW";
+                const missed = guest.status === "EXPECTED" && guest.visitDate < today;
                 const pending = pendingId === guest.id;
                 const mine = guest.hostUserId === currentUserId;
                 return (
@@ -242,15 +245,15 @@ export function GuestManager({
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <div className={`w-[4.75rem] shrink-0 pt-0.5 font-mono text-sm font-medium whitespace-nowrap ${inactive ? "text-muted" : ""}`}>
+                      <div className={`w-[4.75rem] shrink-0 pt-0.5 font-mono text-sm font-medium whitespace-nowrap ${inactive || missed ? "text-muted" : ""}`}>
                         {guest.expectedLabel ?? "No time"}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <h2 className={`text-base font-semibold tracking-tight ${inactive ? "text-muted line-through decoration-1" : ""}`}>
+                          <h2 className={`text-base font-semibold tracking-tight ${inactive || missed ? "text-muted line-through decoration-1" : ""}`}>
                             {guest.guestName}
                           </h2>
-                          <StatusBadge status={guest.status} />
+                          {missed ? <MissedBadge /> : <StatusBadge status={guest.status} />}
                           {guest.invited ? (
                             <span className="badge bg-arrived-soft text-arrived">Invited by {guest.hostName}</span>
                           ) : null}

@@ -13,23 +13,26 @@ class KindStyle {
     GuestKind.expected => const KindStyle(AppColors.expectedSoft, Color(0xFFECD3A3), AppColors.ink),
     GuestKind.late => const KindStyle(AppColors.signalSoft, Color(0xFFF0C3AE), AppColors.ink),
     GuestKind.arrived => const KindStyle(AppColors.clearedSoft, Color(0xFFB6DBC4), AppColors.clearedInk),
-    GuestKind.gone => const KindStyle(AppColors.idleSoft, Color(0xFFD9D6D0), AppColors.idle),
+    GuestKind.gone || GuestKind.missed => const KindStyle(AppColors.idleSoft, Color(0xFFD9D6D0), AppColors.idle),
   };
 
-  static bool struck(GuestKind kind) => kind == GuestKind.arrived || kind == GuestKind.gone;
+  static bool struck(GuestKind kind) => kind == GuestKind.arrived || kind == GuestKind.gone || kind == GuestKind.missed;
 }
 
 TextStyle struckStyle(TextStyle base, bool struck) =>
     struck ? base.copyWith(decoration: TextDecoration.lineThrough, decorationThickness: 1.6) : base;
 
 class StatusBadge extends StatelessWidget {
-  const StatusBadge({super.key, required this.guest, this.late = false});
+  const StatusBadge({super.key, required this.guest, this.late = false, this.missed = false});
   final Guest guest;
   final bool late;
+  final bool missed;
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg, label) = late
+    final (bg, fg, label) = missed
+        ? (AppColors.idleSoft, AppColors.idle, 'Missed')
+        : late
         ? (AppColors.signalSoft, AppColors.signalDeep, 'Late')
         : switch (guest.status) {
             'ARRIVED' || 'CLEARED' => (AppColors.clearedSoft, AppColors.cleared, 'Checked in'),
@@ -245,7 +248,7 @@ class KindDot extends StatelessWidget {
       GuestKind.expected => const Color(0xFFD9A441),
       GuestKind.late => AppColors.signal,
       GuestKind.arrived => AppColors.cleared,
-      GuestKind.gone => AppColors.lineStrong,
+      GuestKind.gone || GuestKind.missed => AppColors.lineStrong,
     };
     return Container(
       width: 9,
